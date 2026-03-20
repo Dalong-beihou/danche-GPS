@@ -1,0 +1,26 @@
+{
+  "ESP32_GPS_003": {
+    "lat": 0,
+    "lng": 0,
+    "wifi_lat": null,
+    "wifi_lng": null,
+    "wifi_valid": false,
+    "wifi_age_ms": null,
+    "ble_lat": 36.53,
+    "ble_lng": 103.722,
+    "ble_valid": true,
+    "ble_age_ms": null,
+    "vibration": 0,
+    "speed": "0.0",
+    "direction": "--",
+    "satellite": 4,
+    "gps_valid": false,
+    "outside_campus": false,
+    "temp": 18.19248,
+    "hum": 27.39449,
+    "status": "idle",
+    "lastOnline": 1774015252642,
+    "remoteIp": "::ffff:127.0.0.1",
+    "protocol": "https"
+  }
+}

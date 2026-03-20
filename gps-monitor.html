@@ -1,0 +1,4384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基于 ESP32 的校园共享单车智能定位与状态监测</title>
+    <style>
+        /* 全局样式重置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg, #f0f2f5);
+            color: var(--text, #1f2937);
+            padding: 16px;
+            min-height: 100vh;
+        }
+
+        /* 头部样式 */
+        .header {
+            background: var(--card, #ffffff);
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header h1 {
+            color: var(--text, #1f2937);
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header h1 i {
+            color: #2563eb;
+            font-size: 24px;
+        }
+
+        .device-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .device-selector label {
+            font-size: 14px;
+            color: var(--subtext, #4b5563);
+        }
+
+        #deviceSelect {
+            padding: 6px 12px;
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 6px;
+            font-size: 14px;
+            background: var(--card, #ffffff);
+            color: var(--text, #1f2937);
+            cursor: pointer;
+        }
+
+        .device-info {
+            color: var(--subtext, #4b5563);
+            font-size: 14px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        /* 按钮通用样式 */
+        .btn {
+            padding: 6px 12px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: background 0.2s ease, transform 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #1d4ed8;
+        }
+
+        .btn:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn-secondary {
+            background: #64748b;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        .btn-location {
+            background: #10b981;
+        }
+
+        .btn-location:hover {
+            background: #059669;
+        }
+
+        .btn-all-devices {
+            background: #f59e0b;
+        }
+
+        .btn-all-devices:hover {
+            background: #d97706;
+        }
+
+        .btn-track {
+            background: #8b5cf6;
+        }
+
+        .btn-track:hover {
+            background: #7c3aed;
+        }
+
+        .btn-clear {
+            background: #ef4444;
+        }
+
+        .btn-clear:hover {
+            background: #dc2626;
+        }
+
+        .btn-device-locate {
+            background: #06b6d4;
+        }
+
+        .btn-device-locate:hover {
+            background: #0891b2;
+        }
+
+        .select-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 6px;
+            background: var(--card, #ffffff);
+            color: var(--text, #1f2937);
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .btn-history {
+            background: #0ea5e9;
+        }
+
+        .btn-history:hover {
+            background: #0284c7;
+        }
+
+        .btn-navigate {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+        }
+
+        .btn-navigate:hover {
+            background: linear-gradient(135deg, #ea580c, #c2410c);
+        }
+
+        /* 主题切换按钮与主题变量 */
+        .btn-theme {
+            background: linear-gradient(135deg, #f59e0b, #10b981);
+            border: none;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+            position: relative;
+            overflow: hidden;
+            width: 56px;
+            height: 56px;
+            padding: 0;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+        .btn-theme::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(rgba(255,255,255,0.35), transparent 70%);
+            transform: rotate(25deg);
+            transition: transform .4s ease;
+        }
+        .btn-theme:hover::before { transform: rotate(25deg) translateX(10%); }
+        :root {
+            --bg: #f0f2f5;
+            --card: #ffffff;
+            --text: #1f2937;
+            --subtext: #4b5563;
+            --border: #e5e7eb;
+            --panel: #f9fafb;
+        }
+        body.theme-dark {
+            --bg: #0f172a;
+            /* 保持字体颜色、边框和卡片背景色与白天模式完全同步 */
+            --card: #ffffff;
+            --text: #1f2937;
+            --subtext: #4b5563;
+            --border: #e5e7eb;
+            --panel: #f9fafb;
+        }
+        body.theme-dark {
+            background-color: var(--bg);
+            color: var(--text);
+        }
+        /* 夜间模式下卡片样式保持同步（白色卡片，深色文字） */
+        body.theme-dark .header,
+        body.theme-dark .data-panel,
+        body.theme-dark .data-item,
+        body.theme-dark .manage-panel,
+        body.theme-dark .device-item,
+        body.theme-dark .status-card,
+        body.theme-dark .map-container {
+            background: var(--card) !important;
+            color: var(--text) !important;
+            border-color: var(--border) !important;
+        }
+        body.theme-dark .data-item { background: var(--panel) !important; }
+        body.theme-dark .device-id,
+        body.theme-dark .device-ip,
+        body.theme-dark .data-unit,
+        body.theme-dark #locationType { color: var(--subtext) !important; }
+        body.theme-dark .status-card.alert {
+            background: rgba(239, 68, 68, 0.1) !important;
+            border: 1px solid rgba(239, 68, 68, 0.3) !important;
+            color: #fecaca !important;
+        }
+
+        /* 固定在页面右上角的主题按钮容器 */
+        .theme-toggle-fixed {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 10000;
+            display: flex;
+            gap: 8px;
+        }
+        /* 温湿度显示已移除 */
+
+        /* 设备管理弹窗样式 */
+        .manage-panel-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 20px;
+        }
+
+        .manage-panel-modal.show {
+            display: flex;
+        }
+
+        .manage-panel {
+            background: var(--card, #ffffff);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            width: 100%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #6b7280;
+        }
+
+        .close-modal:hover {
+            color: #ef4444;
+        }
+
+        .manage-panel h2 {
+            color: var(--text, #1f2937);
+            font-size: 18px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .manage-panel h2 i {
+            color: #2563eb;
+        }
+
+        .device-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            color: #4b5563;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        }
+
+        .color-picker {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-picker input[type="color"] {
+            width: 40px;
+            height: 40px;
+            border: none;
+            padding: 0;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .manage-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .btn-add {
+            background: #10b981;
+        }
+
+        .btn-add:hover {
+            background: #059669;
+        }
+
+        .btn-edit {
+            background: #f59e0b;
+        }
+
+        .btn-edit:hover {
+            background: #d97706;
+        }
+
+        .btn-delete {
+            background: #ef4444;
+        }
+
+        .btn-delete:hover {
+            background: #dc2626;
+        }
+
+        .btn-save {
+            background: #2563eb;
+        }
+
+        .btn-save:hover {
+            background: #1d4ed8;
+        }
+
+        .device-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+
+        .device-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .device-item:last-child {
+            border-bottom: none;
+        }
+
+        .device-item:hover {
+            background-color: var(--panel);
+        }
+
+        .device-item.selected {
+            background-color: #eff6ff;
+            border-left: 4px solid #2563eb;
+        }
+
+        .device-info-left {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .device-name {
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .device-id {
+            font-size: 12px;
+            color: var(--subtext);
+        }
+
+        .device-info-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .device-ip {
+            font-size: 12px;
+            color: var(--subtext);
+        }
+
+        .device-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+
+        .device-status-dot {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 3px solid transparent; /* 用边框保留“标记颜色”，仍然只显示一个圆点 */
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        }
+
+        .status-message {
+            margin-top: 12px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .status-success {
+            background-color: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #d1fae5;
+            display: block;
+        }
+
+        .status-error {
+            background-color: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fee2e2;
+            display: block;
+        }
+
+        /* 主容器样式 */
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+            align-items: stretch;
+        }
+
+        .data-panel {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            height: 100%;
+        }
+
+        .data-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 8px;
+            border-radius: 8px;
+            background-color: var(--panel);
+        }
+
+        .full-width-item {
+            grid-column: 1 / -1;
+        }
+
+        .data-item h3 {
+            color: var(--subtext);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 2px;
+        }
+
+        .data-item h3 i {
+            color: #2563eb;
+            font-size: 14px;
+        }
+
+        .data-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--text);
+            transition: all 0.3s ease;
+        }
+
+        .data-unit {
+            font-size: 10px;
+            color: #6b7280;
+            margin-top: 1px;
+        }
+
+        #locationType {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+
+        .status-card {
+            background: #ecfdf5;
+            border-radius: 6px;
+            padding: 8px;
+            margin-top: 4px;
+            border-left: 3px solid #10b981;
+        }
+
+        .status-card.alert {
+            background: #fef2f2;
+            border-left-color: #ef4444;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-card.warning {
+            background: #fffbeb;
+            border-left-color: #f59e0b;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        .status-card h4 {
+            font-size: 13px;
+            color: #1f2937;
+            margin-bottom: 1px;
+        }
+
+        .status-card p {
+            color: #6b7280;
+            font-size: 11px;
+            line-height: 1.3;
+        }
+
+        .gps-signal {
+            display: flex;
+            gap: 3px;
+            margin-top: 4px;
+        }
+
+        .signal-bar {
+            width: 4px;
+            background: #e5e7eb;
+            border-radius: 1px;
+            transition: height 0.3s ease, background 0.3s ease;
+        }
+
+        .signal-bar:nth-child(1) { height: 6px; }
+        .signal-bar:nth-child(2) { height: 9px; }
+        .signal-bar:nth-child(3) { height: 12px; }
+        .signal-bar:nth-child(4) { height: 15px; }
+        .signal-bar:nth-child(5) { height: 18px; }
+
+        .signal-bar.active { background: #10b981; }
+        .signal-bar.warning { background: #f59e0b; }
+        .signal-bar.alert { background: #ef4444; }
+
+        .distance-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2563eb;
+            transition: all 0.3s ease;
+        }
+
+        /* 地图容器样式 */
+        .map-container {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            position: relative;
+            min-height: 400px;
+            height: 100%;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            color: #6b7280;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 4px 8px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .footer .reconnect {
+            color: #ef4444;
+            font-weight: bold;
+            display: none;
+            font-size: 10px;
+        }
+
+        .footer .reconnect.show {
+            display: block;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            gap: 0;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .map-error {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #ef4444;
+            flex-direction: column;
+            gap: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .device-markers-legend {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            font-size: 11px;
+            color: #1f2937;
+            display: none;
+        }
+
+        .device-markers-legend.show {
+            display: block;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin: 2px 0;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        /* 在线/掉线状态样式（全局统一纯色） */
+        .status-online {
+            color: #00ff00;
+            font-weight: 500;
+        }
+
+        .status-offline {
+            color: #ff0000;
+            font-weight: 500;
+        }
+
+        /* 温湿度显示样式 */
+        .temp-humidity-container {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .temp-humidity-item {
+            flex: 1;
+            min-width: 120px;
+            background: var(--panel);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .temp-humidity-item h3 {
+            color: var(--subtext);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 2px;
+        }
+
+        .temp-humidity-item h3 i {
+            color: #2563eb;
+            font-size: 14px;
+        }
+
+        .temp-humidity-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--text);
+        }
+
+        .temp-humidity-unit {
+            font-size: 10px;
+            color: #6b7280;
+            margin-top: 1px;
+        }
+
+        /* 响应式样式 */
+        @media (min-width: 500px) and (max-width: 767px) {
+            .main-container {
+                grid-template-columns: 280px 1fr;
+            }
+            .map-container {
+                min-height: 500px;
+                height: 100%;
+            }
+        }
+
+        @media (min-width: 768px) {
+            body {
+                padding: 24px;
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+
+            .header {
+                flex-direction: column;
+                padding: 20px 30px;
+                margin-bottom: 20px;
+            }
+
+            .header-top {
+                width: 100%;
+            }
+
+            .header h1 {
+                font-size: 32px;
+                gap: 15px;
+            }
+
+            .header h1 i {
+                font-size: 36px;
+            }
+
+            .header .device-info {
+                font-size: 18px;
+            }
+
+            .header-actions {
+                margin-top: 10px;
+            }
+
+            .main-container {
+                grid-template-columns: minmax(360px, 440px) 1fr;
+                gap: 20px;
+            }
+
+            .data-panel {
+                padding: 15px;
+                gap: 10px;
+                height: 100%;
+            }
+
+            .data-item {
+                padding: 10px;
+            }
+
+            .data-item h3 {
+                font-size: 14px;
+                gap: 6px;
+            }
+
+            .data-item h3 i {
+                font-size: 16px;
+            }
+
+            .data-value {
+                font-size: 18px;
+            }
+
+            .data-unit {
+                font-size: 12px;
+            }
+
+            .status-card {
+                padding: 10px;
+                margin-top: 6px;
+                border-left: 4px solid #10b981;
+            }
+
+            .status-card h4 {
+                font-size: 14px;
+                margin-bottom: 2px;
+            }
+
+            .status-card p {
+                font-size: 12px;
+            }
+
+            .gps-signal {
+                gap: 4px;
+                margin-top: 6px;
+            }
+
+            .signal-bar {
+                width: 5px;
+            }
+
+            .map-container {
+                min-height: 700px;
+                max-height: calc(100vh - 200px);
+                height: 100%;
+                padding: 20px;
+            }
+
+            .footer {
+                font-size: 12px;
+                bottom: 20px;
+                right: 20px;
+                padding: 6px 10px;
+            }
+
+            .footer .reconnect {
+                font-size: 11px;
+            }
+
+            .distance-value {
+                font-size: 22px;
+            }
+
+            #locationType {
+                font-size: 12px;
+            }
+
+            .device-selector {
+                font-size: 16px;
+            }
+
+            #deviceSelect {
+                font-size: 16px;
+                padding: 8px 15px;
+            }
+
+            .device-markers-legend {
+                font-size: 12px;
+                padding: 10px 15px;
+            }
+
+            .legend-dot {
+                width: 10px;
+                height: 10px;
+            }
+        }
+
+        @media (max-height: 750px) {
+            .map-container {
+                height: calc(100vh - 200px);
+                max-height: 600px;
+            }
+        }
+    </style>
+    <!-- 引入高德地图API -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=333602125552fedcc09459ee221edf4d"></script>
+    <!-- 引入Font Awesome图标库 -->
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入fetch polyfill -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
+    <script>
+        // 后端地址配置（可通过环境变量或配置文件修改）
+        const API_BASE_URL = window.location.origin || 'http://localhost:8888';
+
+        // 坐标转换工具（WGS84 <-> GCJ02）
+        const CoordTransform = {
+            PI: 3.1415926535897932384626,
+            ee: 0.00669342162296594323,
+            a: 6378245.0,
+            
+            wgs84togcj02: function(lng, lat) {
+                if (this.outOfChina(lng, lat)) {
+                    return [lng, lat];
+                }
+                let dlat = this.transformLat(lng - 105.0, lat - 35.0);
+                let dlng = this.transformLng(lng - 105.0, lat - 35.0);
+                let radlat = lat / 180.0 * this.PI;
+                let magic = Math.sin(radlat);
+                magic = 1 - this.ee * magic * magic;
+                let sqrtmagic = Math.sqrt(magic);
+                dlat = (dlat * 180.0) / ((this.a * (1 - this.ee)) / (magic * sqrtmagic) * this.PI);
+                dlng = (dlng * 180.0) / (this.a / sqrtmagic * Math.cos(radlat) * this.PI);
+                let mglat = lat + dlat;
+                let mglng = lng + dlng;
+                return [mglng, mglat];
+            },
+            
+            gcj02towgs84: function(lng, lat) {
+                if (this.outOfChina(lng, lat)) {
+                    return [lng, lat];
+                }
+                const gps = this.wgs84togcj02(lng, lat);
+                const lngOffset = gps[0] - lng;
+                const latOffset = gps[1] - lat;
+                return [lng - lngOffset, lat - latOffset];
+            },
+            
+            transformLat: function(lng, lat) {
+                let ret = -100.0 + 2.0 * lng + 3.0 * lat + 0.2 * lat * lat + 0.1 * lng * lat + 0.2 * Math.sqrt(Math.abs(lng));
+                ret += (20.0 * Math.sin(6.0 * lng * this.PI) + 20.0 * Math.sin(2.0 * lng * this.PI)) * 2.0 / 3.0;
+                ret += (20.0 * Math.sin(lat * this.PI) + 40.0 * Math.sin(lat / 3.0 * this.PI)) * 2.0 / 3.0;
+                ret += (160.0 * Math.sin(lat / 12.0 * this.PI) + 320 * Math.sin(lat * this.PI / 30.0)) * 2.0 / 3.0;
+                return ret;
+            },
+            
+            transformLng: function(lng, lat) {
+                let ret = 300.0 + lng + 2.0 * lat + 0.1 * lng * lng + 0.1 * lng * lat + 0.1 * Math.sqrt(Math.abs(lng));
+                ret += (20.0 * Math.sin(6.0 * lng * this.PI) + 20.0 * Math.sin(2.0 * lng * this.PI)) * 2.0 / 3.0;
+                ret += (20.0 * Math.sin(lng * this.PI) + 40.0 * Math.sin(lng / 3.0 * this.PI)) * 2.0 / 3.0;
+                ret += (150.0 * Math.sin(lng / 12.0 * this.PI) + 300.0 * Math.sin(lng / 30.0 * this.PI)) * 2.0 / 3.0;
+                return ret;
+            },
+            
+            outOfChina: function(lng, lat) {
+                return (lng < 72.004 || lng > 137.8347) || (lat < 0.8293 || lat > 55.8271);
+            }
+        };
+    </script>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <h1><i class="fas fa-car-side"></i> 基于 ESP32 的校园共享单车智能定位与状态监测</h1>
+            <div class="device-selector">
+                <label for="deviceSelect">选择设备：</label>
+                <select id="deviceSelect" onchange="switchDevice()">
+                    <option value="all">所有设备</option>
+                    <!-- 设备列表会自动填充 -->
+                </select>
+            </div>
+        </div>
+        <div class="device-info" id="currentDeviceInfo">当前设备：未选择</div>
+        <!-- 固定主题切换按钮（页面右上角） -->
+        <div class="theme-toggle-fixed">
+            <button class="btn btn-theme" id="btnThemeToggle" onclick="toggleTheme()"><i class="fas fa-sun"></i></button>
+        </div>
+        <!-- 温湿度显示已移除 -->
+        <div class="header-actions">
+            <button class="btn" onclick="manualRefresh()"><i class="fas fa-refresh"></i> 手动刷新</button>
+            <button class="btn btn-secondary" onclick="resetMapCenter()"><i class="fas fa-map-marker-alt"></i> 重置地图</button>
+            <button class="btn btn-location" onclick="locateSelf()"><i class="fas fa-user-location"></i> 定位自身位置</button>
+            <button class="btn btn-all-devices" onclick="showAllDevices()"><i class="fas fa-map-pin"></i> 显示所有设备</button>
+            <button class="btn btn-device-locate" onclick="locateDevice()"><i class="fas fa-crosshairs"></i> 定位到设备</button>
+            <!-- 自定义校园边界按钮 -->
+            <button class="btn btn-custom-boundary" onclick="startCustomBoundary()"><i class="fas fa-draw-polygon"></i> 自定义校园边界</button>
+            <!-- 定位方式切换按钮 -->
+            <select id="locationModeSelect" class="select-btn" onchange="setLocationMode(this.value)">
+                <option value="auto">定位方式：自动(GPS优先)</option>
+                <option value="gps">定位方式：GPS</option>
+                <option value="ble">定位方式：蓝牙</option>
+            </select>
+            <button class="btn btn-track" id="btnToggleTrack" onclick="toggleTrackDisplay()"><i class="fas fa-route"></i> 显示轨迹</button>
+            <button class="btn btn-clear" id="btnClearTrack" onclick="clearTrack()"><i class="fas fa-eraser"></i> 消除轨迹</button>
+            <button class="btn btn-history" id="btnHistoryTrack" onclick="openHistoryModal()"><i class="fas fa-clock-rotate-left"></i> 查看历史行程</button>
+            <button class="btn btn-navigate" onclick="startNavigation()"><i class="fas fa-route"></i> 寻车导航</button>
+            <!-- 设备管理按钮 -->
+            <button class="btn" onclick="openManagePanel()"><i class="fas fa-cogs"></i> 设备管理</button>
+        </div>
+    </div>
+
+    <!-- 设备管理弹窗 -->
+    <div class="manage-panel-modal" id="managePanelModal">
+        <div class="manage-panel">
+            <button class="close-modal" onclick="closeManagePanel()">&times;</button>
+            <h2><i class="fas fa-cogs"></i> 共享单车信息管理</h2>
+            
+            <div class="device-form">
+                <div class="form-group">
+                    <label for="deviceIdInput">设备ID</label>
+                    <input type="text" id="deviceIdInput" placeholder="例如：ESP32_GPS_004" required>
+                </div>
+                <div class="form-group">
+                    <label for="deviceNameInput">设备名称</label>
+                    <input type="text" id="deviceNameInput" placeholder="例如：共享单车004" required>
+                </div>
+                <div class="form-group">
+                    <label for="deviceIpInput">设备IP地址</label>
+                    <input type="text" id="deviceIpInput" placeholder="例如：192.168.1.103" required>
+                </div>
+                <div class="form-group">
+                    <label for="deviceColorInput">标记颜色</label>
+                    <div class="color-picker">
+                        <input type="color" id="deviceColorInput" value="#FF0000">
+                        <span id="colorValue">#FF0000</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="manage-actions">
+                <button class="btn btn-add" onclick="addDevice()"><i class="fas fa-plus"></i> 添加设备</button>
+                <button class="btn btn-edit" onclick="editDevice()"><i class="fas fa-edit"></i> 修改设备</button>
+                <button class="btn btn-delete" onclick="deleteSelectedDevice()"><i class="fas fa-trash"></i> 删除选中设备</button>
+                <button class="btn btn-save" onclick="saveDevicesToJson()"><i class="fas fa-save"></i> 保存到JSON文件</button>
+            </div>
+            
+            <div class="device-list" id="deviceList">
+                <!-- 设备列表会动态生成 -->
+            </div>
+            
+            <div class="status-message" id="statusMessage"></div>
+        </div>
+    </div>
+
+    <!-- 历史行程弹窗 -->
+    <div class="manage-panel-modal" id="historyModal">
+        <div class="manage-panel">
+            <button class="close-modal" onclick="closeHistoryModal()">&times;</button>
+            <h2><i class="fas fa-clock-rotate-left"></i> 历史行程</h2>
+            <div style="display:grid; gap:12px;">
+                <div class="map-container" style="height:360px;">
+                    <div id="historyMap" style="width:100%;height:100%;border-radius:8px;"></div>
+                </div>
+                <div id="historyContent" class="device-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="data-panel">
+            <div class="data-item">
+                <h3><i class="fas fa-map-marker-alt"></i> 纬度</h3>
+                <div class="data-value" id="latitude">--</div>
+                <div class="data-unit">(°)</div>
+            </div>
+
+            <div class="data-item">
+                <h3><i class="fas fa-map-marker-alt"></i> 经度</h3>
+                <div class="data-value" id="longitude">--</div>
+                <div class="data-unit">(°)</div>
+            </div>
+
+            <div class="data-item">
+                <h3><i class="fas fa-clock"></i> GPS时间</h3>
+                <div class="data-value" id="gpstime">--</div>
+                <div class="data-unit">北京时间</div>
+            </div>
+
+            <div class="data-item">
+                <h3><i class="fas fa-satellite"></i> 卫星数量</h3>
+                <div class="data-value" id="satellite">--</div>
+                <div class="data-unit">颗</div>
+            </div>
+
+            <div class="data-item">
+                <h3><i class="fas fa-location-arrow"></i> 与车辆距离</h3>
+                <div class="distance-value" id="distance">--</div>
+                <div class="data-unit" id="distanceUnit">米</div>
+                <div id="locationType">定位方式：未知</div>
+            </div>
+
+            <div class="data-item">
+                <h3><i class="fas fa-tachometer-alt"></i> 车辆速度</h3>
+                <div class="distance-value" id="speed">--</div>
+                <div class="data-unit">km/h</div>
+                <div id="speedStatus" style="font-size: 11px; color: #6b7280; margin-top: 4px;">行驶状态：停止</div>
+            </div>
+
+            <div class="data-item full-width-item">
+                <h3><i class="fas fa-satellite-dish"></i> GPS连接状态</h3>
+                <div class="status-card" id="gpsStatusCard">
+                    <h4>未检测</h4>
+                    <p id="gpsStatusDesc">正在检测GPS模块连接状态...</p>
+                    <div class="gps-signal" id="gpsSignal">
+                        <div class="signal-bar"></div>
+                        <div class="signal-bar"></div>
+                        <div class="signal-bar"></div>
+                        <div class="signal-bar"></div>
+                        <div class="signal-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-item">
+                <h3><i class="fas fa-exclamation-triangle"></i> 震动报警</h3>
+                <div class="status-card" id="vibrationCard">
+                    <h4>无震动</h4>
+                    <p id="vibrationDesc">未检测到有效震动，车辆安全</p>
+                </div>
+            </div>
+            <div class="data-item">
+                <h3><i class="fas fa-car"></i> 使用状态</h3>
+                <div class="status-card" id="statusCard">
+                    <h4>车辆空闲</h4>
+                    <p id="statusDesc">车辆当前空闲，可正常使用</p>
+                </div>
+            </div>
+
+            <!-- 温湿度显示 -->
+            <div class="temp-humidity-container full-width-item">
+                <div class="temp-humidity-item">
+                    <h3><i class="fas fa-temperature-high"></i> 温度</h3>
+                    <div class="temp-humidity-value" id="temperature">--</div>
+                    <div class="temp-humidity-unit">℃</div>
+                </div>
+                <div class="temp-humidity-item">
+                    <h3><i class="fas fa-tint"></i> 湿度</h3>
+                    <div class="temp-humidity-value" id="humidity">--</div>
+                    <div class="temp-humidity-unit">%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div class="device-markers-legend" id="deviceLegend">
+                <div style="font-weight: bold; margin-bottom: 5px;">设备标识</div>
+                <!-- 图例会自动填充 -->
+            </div>
+            <div id="map">
+                <div class="loading" id="mapLoading">
+                    <div class="spinner"></div>
+                </div>
+                <div class="map-error" id="mapError">
+                    <i class="fas fa-exclamation-circle" style="font-size: 24px;"></i>
+                    <div id="mapErrorText">地图加载失败，请检查网络或API密钥</div>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <div class="reconnect" id="reconnectTip">⚠️ 以下设备离线：<span id="offlineDeviceList"></span></div>
+                <div id="refreshInfo">最后刷新时间：-- | 数据刷新频率：1秒/次</div>
+                <div id="deviceCountInfo">在线设备数：0 / 总设备数：0</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./speed-utils.js"></script>
+    <script src="./track-utils.js"></script>
+    <script>
+        // 全局变量
+        let map = null;
+        let userMarker = null;
+        let deviceMarkers = {}; // 存储所有设备标记 {deviceId: marker}
+        let deviceData = {}; // 存储所有设备数据 {deviceId: data}
+        let currentDeviceId = "all"; // 当前选中的设备ID
+        let userPosition = null;
+        let reconnectTimers = {}; // 每个设备独立的重连定时器
+        let isReconnecting = {}; // 每个设备的重连状态
+        let outsideCampusNotified = {}; // 设备离开校园提示标记
+        // 自定义校园边界相关
+        let isDrawingBoundary = false; // 是否正在绘制边界
+        let boundaryPolygon = null; // 边界多边形对象
+        let boundaryCoords = []; // 边界坐标
+        let watchId = null;
+        let fetchIntervalIds = {}; // 每个设备独立的刷新定时器
+        let alertAudio = null;
+        let currentLocationType = "未知";
+        let currentTheme = "light";
+        let selectedDeviceId = null; // 选中的管理设备ID
+        let deviceLocationMode = 'auto';
+
+        // 初始地图自动定位（避免刚打开需要手动刷新/重置）
+        let hasInitialMapFit = false;
+        let initialFitTimer = null;
+        let hasShownMapInitAlert = false; // 地图尚未初始化提示标识
+
+        // 轨迹显示相关
+        let trackVisible = false;
+        let trackPolylines = {}; // {deviceId: AMap.Polyline}
+        let trackRefreshTimer = null;
+        const TRACK_REFRESH_INTERVAL = 2000;
+        let hasNotifiedNoTrack = false;
+        let historyPolylines = []; // 历史行程多段线集合
+        let _historySegments = []; // 最近获取的历史分段
+        let trackClearLogs = [];
+        
+        // 从JSON加载的配置
+        let DEVICES_CONFIG = [];
+        let RECONNECT_INTERVAL = 3000;
+        let DATA_REFRESH_INTERVAL = 1000;
+        let fetchFailures = {};
+        let offlineNotified = {}; // 记录设备离线提示是否已经显示过
+        const ONLINE_GRACE_MS = 35000;
+        const SPEED_HOLD_MS = 2500;
+        const SPEED_ANIM_MS = 250;
+        const SPEED_EPS = 0.01;
+        let speedDisplayCache = {};
+        let speedAnimHandles = {};
+
+        // fetch超时封装（浏览器原生fetch不支持timeout参数）
+        const DEFAULT_FETCH_TIMEOUT_MS = 8000;
+        async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_FETCH_TIMEOUT_MS) {
+            if (typeof AbortController === 'undefined') {
+                return await fetch(url, options);
+            }
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                return await fetch(url, { ...options, signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // 颜色渐变相关函数
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => {
+                const hex = Math.round(x).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+        }
+
+        function getGradientColor(startHex, endHex, progress) {
+            const startRgb = hexToRgb(startHex);
+            const endRgb = hexToRgb(endHex);
+            if (!startRgb || !endRgb) return startHex;
+            
+            const r = startRgb.r + (endRgb.r - startRgb.r) * progress;
+            const g = startRgb.g + (endRgb.g - startRgb.g) * progress;
+            const b = startRgb.b + (endRgb.b - startRgb.b) * progress;
+            
+            return rgbToHex(r, g, b);
+        }
+
+        function getStartColor(deviceColor) {
+            const rgb = hexToRgb(deviceColor);
+            if (!rgb) return deviceColor;
+            return rgbToHex(rgb.r * 0.4, rgb.g * 0.4, rgb.b * 0.4);
+        }
+
+        function getEndColor(deviceColor) {
+            return deviceColor;
+        }
+
+        function renderGradientPolyline(points, baseColor, polylines, map) {
+            if (points.length < 2) return;
+            
+            const startColor = getStartColor(baseColor);
+            const endColor = getEndColor(baseColor);
+            const totalSegments = points.length - 1;
+            
+            const MAX_GRADIENT_POINTS = 50;
+            let step = 1;
+            let effectivePoints = points;
+            
+            if (points.length > MAX_GRADIENT_POINTS) {
+                step = Math.ceil(points.length / MAX_GRADIENT_POINTS);
+                effectivePoints = [];
+                for (let i = 0; i < points.length; i += step) {
+                    effectivePoints.push(points[i]);
+                }
+                if (effectivePoints[effectivePoints.length - 1] !== points[points.length - 1]) {
+                    effectivePoints.push(points[points.length - 1]);
+                }
+            }
+            
+            const effectiveTotalSegments = effectivePoints.length - 1;
+            
+            for (let i = 0; i < effectiveTotalSegments; i++) {
+                const progress = i / Math.max(effectiveTotalSegments - 1, 1);
+                const segmentColor = getGradientColor(startColor, endColor, progress);
+                
+                const segmentPolyline = new AMap.Polyline({
+                    path: [
+                        [effectivePoints[i][0], effectivePoints[i][1]],
+                        [effectivePoints[i + 1][0], effectivePoints[i + 1][1]]
+                    ],
+                    strokeColor: segmentColor,
+                    strokeWeight: 6,
+                    strokeOpacity: 0.85,
+                    strokeStyle: 'solid',
+                    zIndex: 40
+                });
+                segmentPolyline.setMap(map);
+                polylines.push(segmentPolyline);
+            }
+        }
+
+        // 节流函数
+        function throttle(func, limit) {
+            let inThrottle;
+            return function executedFunction(...args) {
+                if (!inThrottle) {
+                    func.apply(this, args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            };
+        }
+
+        function getAuditUser() {
+            const saved = localStorage.getItem('currentUser') || localStorage.getItem('username');
+            return saved || 'anonymous';
+        }
+
+        function appendTrackClearLog(entry) {
+            trackClearLogs.push(entry);
+            try {
+                localStorage.setItem('trackClearLogs', JSON.stringify(trackClearLogs.slice(-100)));
+            } catch (e) {}
+        }
+
+        function animateSpeedValue(deviceId, el, from, to) {
+            if (speedAnimHandles[deviceId]) {
+                cancelAnimationFrame(speedAnimHandles[deviceId]);
+            }
+            const start = performance.now();
+            const duration = SPEED_ANIM_MS;
+            const step = (now) => {
+                const p = Math.min(1, (now - start) / duration);
+                const val = SpeedUtils.interpolateSpeed(from, to, p);
+                el.textContent = val.toFixed(1);
+                if (p < 1) {
+                    speedAnimHandles[deviceId] = requestAnimationFrame(step);
+                }
+            };
+            speedAnimHandles[deviceId] = requestAnimationFrame(step);
+        }
+
+        // 初始化
+        window.onload = async function() {
+            initTheme();
+            // 温湿度显示已移除
+            // initTempHumPosition();
+            checkHttpsProtocol();
+            initAlertAudio();
+            try {
+                const savedLogs = localStorage.getItem('trackClearLogs');
+                if (savedLogs) {
+                    trackClearLogs = JSON.parse(savedLogs) || [];
+                }
+            } catch (e) {
+                trackClearLogs = [];
+            }
+            const savedMode = localStorage.getItem('deviceLocationMode');
+            if (savedMode === 'auto' || savedMode === 'gps' || savedMode === 'ble') {
+                deviceLocationMode = savedMode;
+            }
+            const modeSelect = document.getElementById('locationModeSelect');
+            if (modeSelect) {
+                modeSelect.value = deviceLocationMode;
+            }
+            
+            // 加载设备配置（优先从后端接口加载，降级到本地JSON）
+            try {
+                // 尝试从后端接口加载
+                const response = await fetchWithTimeout(`${API_BASE_URL}/api/config/devices`, {
+                    method: 'GET',
+                    cache: 'no-cache'
+                }, 8000);
+                
+                if (response.ok) {
+                    const config = await response.json();
+                    DEVICES_CONFIG = config.data || [];
+                    RECONNECT_INTERVAL = config.reconnectInterval || 3000;
+                    DATA_REFRESH_INTERVAL = config.dataRefreshInterval || 1000;
+                    console.log('从后端接口加载设备配置成功：', DEVICES_CONFIG);
+                } else {
+                    // 降级到本地JSON
+                    throw new Error('后端接口不可用，使用本地配置');
+                }
+            } catch (error) {
+                console.warn('加载后端配置失败，尝试本地JSON：', error);
+                try {
+                    const response = await fetchWithTimeout('./devices-config.json', {
+                        method: 'GET',
+                        cache: 'no-cache'
+                    }, 8000);
+                    
+                    if (!response.ok) {
+                        throw new Error(`加载本地配置文件失败：HTTP ${response.status}`);
+                    }
+                    
+                    const config = await response.json();
+                    DEVICES_CONFIG = config.devices || [];
+                    RECONNECT_INTERVAL = config.reconnectInterval || 3000;
+                    DATA_REFRESH_INTERVAL = config.dataRefreshInterval || 1000;
+                    console.log('从本地JSON加载设备配置成功：', DEVICES_CONFIG);
+                } catch (localError) {
+                    console.error('加载本地配置也失败：', localError);
+                    showStatusMessage(`加载配置失败：${localError.message}\n将使用默认配置`, 'error');
+                    // 备用默认配置
+                    DEVICES_CONFIG = [
+                        { id: "ESP32_GPS_001", name: "共享单车001", ip: "192.168.1.100", color: "#FF0000" },
+                        { id: "ESP32_GPS_002", name: "共享单车002", ip: "192.168.1.101", color: "#00FF00" },
+                        { id: "ESP32_GPS_003", name: "共享单车003", ip: "192.168.1.102", color: "#0000FF" }
+                    ];
+                }
+            }
+
+            // 初始化颜色选择器事件
+            document.getElementById('deviceColorInput').addEventListener('input', function() {
+                document.getElementById('colorValue').textContent = this.value;
+            });
+
+            initDeviceSelector();
+            initDeviceLegend();
+            renderDeviceList();
+            initMap();
+            getUserLocation();
+            
+            // 初始化所有设备
+            initAllDevices();
+
+            // 启动初始视野自动调整（等待设备数据/定位异步到达）
+            startInitialFitWatcher();
+
+            window.addEventListener('online', () => {
+                Object.keys(isReconnecting).forEach(deviceId => {
+                    stopReconnect(deviceId);
+                    setTimeout(() => fetchDeviceData(deviceId), 1000);
+                });
+            });
+            window.addEventListener('offline', () => {
+                Object.keys(isReconnecting).forEach(deviceId => {
+                    startReconnect(deviceId);
+                });
+            });
+        };
+
+        // 初始化所有设备
+        function initAllDevices() {
+            DEVICES_CONFIG.forEach(device => {
+                isReconnecting[device.id] = false;
+                fetchDeviceData(device.id);
+                if (!fetchIntervalIds[device.id]) {
+                    fetchIntervalIds[device.id] = setInterval(() => fetchDeviceData(device.id), DATA_REFRESH_INTERVAL);
+                }
+            });
+            
+            // 同步定位方式选择框的状态
+            const selectElement = document.getElementById('locationModeSelect');
+            if (selectElement) {
+                selectElement.value = deviceLocationMode;
+            }
+            
+            // 初始化时，如果没有选择设备，隐藏所有设备图标
+            if (currentDeviceId === "all") {
+                DEVICES_CONFIG.forEach(device => {
+                    if (deviceMarkers[device.id]) {
+                        deviceMarkers[device.id].hide();
+                    }
+                });
+            }
+        }
+
+        function startInitialFitWatcher() {
+            if (initialFitTimer) return;
+            let tick = 0;
+            initialFitTimer = setInterval(() => {
+                tick++;
+                if (hasInitialMapFit) {
+                    clearInterval(initialFitTimer);
+                    initialFitTimer = null;
+                    return;
+                }
+                tryInitialFitView();
+                // 最多等待约15秒，避免长期占用
+                if (tick >= 30) {
+                    clearInterval(initialFitTimer);
+                    initialFitTimer = null;
+                }
+            }, 500);
+        }
+
+        function getBestInitialDeviceId() {
+            if (currentDeviceId && currentDeviceId !== 'all') return currentDeviceId;
+            // 优先在线且坐标有效
+            for (const d of DEVICES_CONFIG) {
+                const data = deviceData[d.id];
+                if (data?.online === true && isEffectiveCoord(data.lat, data.lng)) return d.id;
+            }
+            // 其次只要坐标有效
+            for (const d of DEVICES_CONFIG) {
+                const data = deviceData[d.id];
+                if (data && isEffectiveCoord(data.lat, data.lng)) return d.id;
+            }
+            return null;
+        }
+
+        function tryInitialFitView() {
+            if (hasInitialMapFit || !map) return;
+
+            const overlays = [];
+            if (userMarker) overlays.push(userMarker);
+
+            const bestDeviceId = getBestInitialDeviceId();
+            if (bestDeviceId && deviceMarkers[bestDeviceId]) overlays.push(deviceMarkers[bestDeviceId]);
+
+            if (overlays.length >= 2) {
+                try {
+                    map.setFitView(overlays, true, [80, 80, 80, 80]);
+                    const z = map.getZoom?.();
+                    if (typeof z === 'number') map.setZoom(Math.min(z, 18));
+                    hasInitialMapFit = true;
+                } catch (e) {}
+                return;
+            }
+
+            // 只有一个点时也先定位过去（避免打开后不在有效区域）
+            if (overlays.length === 1) {
+                try {
+                    const pos = overlays[0].getPosition?.();
+                    if (pos) {
+                        map.panTo(pos);
+                        map.setZoom(18);
+                        hasInitialMapFit = true;
+                    }
+                } catch (e) {}
+            }
+        }
+
+        // 资源清理
+        window.addEventListener('beforeunload', function() {
+            if (watchId) navigator.geolocation.clearWatch(watchId);
+            
+            // 清理所有定时器
+            Object.keys(reconnectTimers).forEach(deviceId => {
+                clearInterval(reconnectTimers[deviceId]);
+            });
+            Object.keys(fetchIntervalIds).forEach(deviceId => {
+                clearInterval(fetchIntervalIds[deviceId]);
+            });
+            
+            if (map) map.destroy();
+            if (alertAudio) {
+                alertAudio.pause();
+                alertAudio = null;
+            }
+            map = null;
+            userMarker = null;
+            deviceMarkers = {};
+            deviceData = {};
+            reconnectTimers = {};
+            fetchIntervalIds = {};
+            isReconnecting = {};
+            if (initialFitTimer) clearInterval(initialFitTimer);
+            initialFitTimer = null;
+        });
+
+        // 提示工具：地图尚未初始化（仅显示一次）
+        function showMapInitAlert() {
+            if (!hasShownMapInitAlert) {
+                alert('地图尚未初始化，请稍候！');
+                hasShownMapInitAlert = true;
+            }
+        }
+
+        // ========== 设备管理核心功能 ==========
+        // 打开设备管理弹窗
+        function openManagePanel() {
+            document.getElementById('managePanelModal').classList.add('show');
+            renderDeviceList();
+        }
+
+        // 关闭设备管理弹窗
+        function closeManagePanel() {
+            document.getElementById('managePanelModal').classList.remove('show');
+        }
+
+        // 初始化设备选择器
+        function initDeviceSelector() {
+            const select = document.getElementById('deviceSelect');
+            const currentValue = select.value;
+            
+            const existingOptions = Array.from(select.options).filter(option => option.value !== 'all');
+            const deviceIds = DEVICES_CONFIG.map(d => d.id);
+            
+            // 移除已删除的设备选项
+            existingOptions.forEach(option => {
+                if (!deviceIds.includes(option.value)) {
+                    select.remove(option.index);
+                }
+            });
+            
+            // 更新/添加设备选项
+            DEVICES_CONFIG.forEach(device => {
+                const isOnline = deviceData[device.id]?.online === true;
+                const statusText = isOnline ? '[在线]' : '[掉线]';
+                const statusClass = isOnline ? 'status-online' : 'status-offline';
+                
+                let option = Array.from(select.options).find(opt => opt.value === device.id);
+                if (!option) {
+                    option = document.createElement('option');
+                    option.value = device.id;
+                    select.appendChild(option);
+                }
+                
+                option.textContent = `${device.name} (${device.id}) ${statusText}`;
+                option.className = statusClass;
+            });
+            
+            // 保持当前选中状态
+            if (deviceIds.includes(currentValue) || currentValue === 'all') {
+                select.value = currentValue;
+            } else {
+                select.value = 'all';
+                currentDeviceId = 'all';
+            }
+        }
+
+        // 渲染设备管理列表
+        function renderDeviceList() {
+            const deviceListEl = document.getElementById('deviceList');
+            deviceListEl.innerHTML = '';
+            
+            DEVICES_CONFIG.forEach(device => {
+                const isOnline = deviceData[device.id]?.online === true;
+                const statusText = isOnline ? '在线' : '掉线';
+                const statusColor = isOnline ? '#00ff00' : '#ff0000';
+                
+                // 获取车辆状态
+                const vehicleStatus = deviceData[device.id]?.status || 'idle';
+                let vehicleStatusText = '空闲';
+                let vehicleStatusColor = '#6b7280';
+                
+                switch(vehicleStatus) {
+                    case 'in_use':
+                        vehicleStatusText = '使用中';
+                        vehicleStatusColor = '#10b981';
+                        break;
+                    case 'abnormal':
+                        vehicleStatusText = '异常';
+                        vehicleStatusColor = '#ef4444';
+                        break;
+                    case 'idle':
+                    default:
+                        vehicleStatusText = '空闲';
+                        vehicleStatusColor = '#6b7280';
+                        break;
+                }
+                
+                const deviceItem = document.createElement('div');
+                deviceItem.className = `device-item ${selectedDeviceId === device.id ? 'selected' : ''}`;
+                deviceItem.dataset.deviceId = device.id;
+                
+                deviceItem.innerHTML = `
+                    <div class="device-info-left">
+                        <div class="device-name">
+                            ${device.name} 
+                            <span style="color: ${statusColor}; font-size: 12px; margin-left: 8px;">
+                                【${statusText}】
+                            </span>
+                            <span style="color: ${vehicleStatusColor}; font-size: 12px; margin-left: 8px;">
+                                【${vehicleStatusText}】
+                            </span>
+                        </div>
+                        <div class="device-id">${device.id}</div>
+                    </div>
+                    <div class="device-info-right">
+                        <div class="device-ip">${device.ip}</div>
+                        <div class="device-status-dot" title="在线状态（纯色）" style="background-color: ${statusColor}; border-color: transparent"></div>
+                    </div>
+                `;
+                
+                deviceItem.addEventListener('click', () => {
+                    // 取消之前选中的样式
+                    document.querySelectorAll('.device-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    // 设置新选中的样式
+                    deviceItem.classList.add('selected');
+                    selectedDeviceId = device.id;
+                    
+                    // 填充表单
+                    document.getElementById('deviceIdInput').value = device.id;
+                    document.getElementById('deviceNameInput').value = device.name;
+                    document.getElementById('deviceIpInput').value = device.ip;
+                    document.getElementById('deviceColorInput').value = device.color;
+                    document.getElementById('colorValue').textContent = device.color;
+                });
+                
+                deviceListEl.appendChild(deviceItem);
+            });
+        }
+
+        // 添加设备
+        async function addDevice() {
+            const deviceId = document.getElementById('deviceIdInput').value.trim();
+            const deviceName = document.getElementById('deviceNameInput').value.trim();
+            const deviceIp = document.getElementById('deviceIpInput').value.trim();
+            const deviceColor = document.getElementById('deviceColorInput').value;
+            
+            if (!deviceId || !deviceName || !deviceIp) {
+                showStatusMessage('请填写完整的设备信息！', 'error');
+                return;
+            }
+            
+            // 检查设备ID是否已存在
+            const exists = DEVICES_CONFIG.some(d => d.id === deviceId);
+            if (exists) {
+                showStatusMessage(`设备ID ${deviceId} 已存在！`, 'error');
+                return;
+            }
+            
+            const newDevice = {
+                id: deviceId,
+                name: deviceName,
+                ip: deviceIp,
+                color: deviceColor
+            };
+            
+            try {
+                // 优先调用后端接口添加
+                const response = await fetch(`${API_BASE_URL}/api/config/device`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(newDevice)
+                });
+                
+                const result = await response.json();
+                if (result.code === 0) {
+                    DEVICES_CONFIG = result.data;
+                } else {
+                    throw new Error(result.msg || '添加失败');
+                }
+            } catch (error) {
+                console.warn('后端添加设备失败，使用本地模式：', error);
+                DEVICES_CONFIG.push(newDevice);
+            }
+            
+            // 更新UI
+            renderDeviceList();
+            initDeviceSelector();
+            initDeviceLegend();
+            
+            // 初始化新设备
+            isReconnecting[deviceId] = false;
+            fetchDeviceData(deviceId);
+            fetchIntervalIds[deviceId] = setInterval(() => fetchDeviceData(deviceId), DATA_REFRESH_INTERVAL);
+            
+            // 清空表单
+            clearDeviceForm();
+            
+            showStatusMessage(`设备 ${deviceName} 添加成功！`, 'success');
+            updateDeviceCountInfo();
+            updateReconnectTip();
+        }
+
+        // 修改设备（支持修改设备ID）
+        async function editDevice() {
+            if (!selectedDeviceId) {
+                showStatusMessage('请先选中要修改的设备！', 'error');
+                return;
+            }
+            
+            // 获取表单中修改后的值（包括设备ID）
+            const newDeviceId = document.getElementById('deviceIdInput').value.trim();
+            const deviceName = document.getElementById('deviceNameInput').value.trim();
+            const deviceIp = document.getElementById('deviceIpInput').value.trim();
+            const deviceColor = document.getElementById('deviceColorInput').value;
+            
+            if (!newDeviceId || !deviceName || !deviceIp || !deviceColor) {
+                showStatusMessage('请填写完整的修改信息！', 'error');
+                return;
+            }
+            
+            // 检查新ID是否已存在（排除原ID）
+            if (newDeviceId !== selectedDeviceId && DEVICES_CONFIG.some(d => d.id === newDeviceId)) {
+                showStatusMessage(`设备ID ${newDeviceId} 已存在！`, 'error');
+                return;
+            }
+            
+            // 找到要修改的设备
+            const deviceIndex = DEVICES_CONFIG.findIndex(d => d.id === selectedDeviceId);
+            if (deviceIndex === -1) {
+                showStatusMessage('未找到该设备！', 'error');
+                return;
+            }
+            
+            // 准备更新数据
+            const updatedDevice = {
+                id: newDeviceId, // 使用新的设备ID
+                name: deviceName,
+                ip: deviceIp,
+                color: deviceColor
+            };
+            
+            try {
+                // 优先调用后端接口修改（如果ID变更，需要特殊处理）
+                if (newDeviceId === selectedDeviceId) {
+                    // ID未变，正常修改
+                    const response = await fetch(`${API_BASE_URL}/api/config/device/${selectedDeviceId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            name: deviceName,
+                            ip: deviceIp,
+                            color: deviceColor
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    if (result.code === 0) {
+                        DEVICES_CONFIG = result.data;
+                    } else {
+                        throw new Error(result.msg || '修改失败');
+                    }
+                } else {
+                    // ID变更，先删除原设备，再添加新设备
+                    // 1. 删除原设备
+                    await fetch(`${API_BASE_URL}/api/config/device/${selectedDeviceId}`, {
+                        method: 'DELETE'
+                    });
+                    // 2. 添加新设备
+                    const response = await fetch(`${API_BASE_URL}/api/config/device`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(updatedDevice)
+                    });
+                    
+                    const result = await response.json();
+                    if (result.code === 0) {
+                        DEVICES_CONFIG = result.data;
+                    } else {
+                        throw new Error(result.msg || '修改ID失败');
+                    }
+                }
+            } catch (error) {
+                console.warn('后端修改设备失败，使用本地模式：', error);
+                
+                // 本地模式处理ID变更
+                if (newDeviceId !== selectedDeviceId) {
+                    // 1. 清理原设备的资源
+                    if (reconnectTimers[selectedDeviceId]) {
+                        clearInterval(reconnectTimers[selectedDeviceId]);
+                        delete reconnectTimers[selectedDeviceId];
+                    }
+                    if (fetchIntervalIds[selectedDeviceId]) {
+                        clearInterval(fetchIntervalIds[selectedDeviceId]);
+                        delete fetchIntervalIds[selectedDeviceId];
+                    }
+                    if (deviceMarkers[selectedDeviceId]) {
+                        deviceMarkers[selectedDeviceId].remove();
+                        delete deviceMarkers[selectedDeviceId];
+                    }
+                    
+                    // 2. 复制原设备数据到新ID
+                    if (deviceData[selectedDeviceId]) {
+                        deviceData[newDeviceId] = { ...deviceData[selectedDeviceId] };
+                        delete deviceData[selectedDeviceId];
+                    }
+                    
+                    isReconnecting[newDeviceId] = isReconnecting[selectedDeviceId] || false;
+                    delete isReconnecting[selectedDeviceId];
+                }
+                
+                // 更新配置
+                DEVICES_CONFIG.splice(deviceIndex, 1);
+                DEVICES_CONFIG.push(updatedDevice);
+            }
+            
+            // 更新地图标记（如果ID变更，需要重新创建标记）
+            if (newDeviceId !== selectedDeviceId) {
+                if (deviceMarkers[selectedDeviceId]) {
+                    deviceMarkers[selectedDeviceId].remove();
+                    delete deviceMarkers[selectedDeviceId];
+                }
+            } else if (deviceMarkers[newDeviceId]) {
+                // ID未变，仅更新标记颜色
+                const markerContent = document.createElement('div');
+                markerContent.style.cssText = `
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    background-color: ${deviceColor};
+                    border: 2px solid white;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    color: white;
+                    font-size: 12px;
+                    font-weight: bold;
+                `;
+                markerContent.textContent = newDeviceId.slice(-2);
+                deviceMarkers[newDeviceId].setContent(markerContent);
+            }
+            
+            // 更新UI
+            renderDeviceList();
+            initDeviceSelector();
+            initDeviceLegend();
+            
+            // 更新选中状态为新ID
+            selectedDeviceId = newDeviceId;
+            
+            showStatusMessage(`设备 ${deviceName} 修改成功！`, 'success');
+        }
+
+        // 删除选中设备
+        async function deleteSelectedDevice() {
+            if (!selectedDeviceId) {
+                showStatusMessage('请先选中要删除的设备！', 'error');
+                return;
+            }
+            
+            if (!confirm(`确定要删除设备 ${selectedDeviceId} 吗？`)) {
+                return;
+            }
+            
+            try {
+                // 优先调用后端接口删除
+                const response = await fetch(`${API_BASE_URL}/api/config/device/${selectedDeviceId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                if (result.code === 0) {
+                    DEVICES_CONFIG = result.data;
+                } else {
+                    throw new Error(result.msg || '删除失败');
+                }
+            } catch (error) {
+                console.warn('后端删除设备失败，使用本地模式：', error);
+                DEVICES_CONFIG = DEVICES_CONFIG.filter(d => d.id !== selectedDeviceId);
+            }
+            
+            // 清理资源
+            if (reconnectTimers[selectedDeviceId]) {
+                clearInterval(reconnectTimers[selectedDeviceId]);
+                delete reconnectTimers[selectedDeviceId];
+            }
+            if (fetchIntervalIds[selectedDeviceId]) {
+                clearInterval(fetchIntervalIds[selectedDeviceId]);
+                delete fetchIntervalIds[selectedDeviceId];
+            }
+            if (deviceMarkers[selectedDeviceId]) {
+                deviceMarkers[selectedDeviceId].remove();
+                delete deviceMarkers[selectedDeviceId];
+            }
+            
+            delete deviceData[selectedDeviceId];
+            delete isReconnecting[selectedDeviceId];
+            
+            // 更新UI
+            renderDeviceList();
+            initDeviceSelector();
+            initDeviceLegend();
+            
+            // 清空选中状态
+            clearDeviceForm();
+            selectedDeviceId = null;
+            
+            showStatusMessage(`设备 删除成功！`, 'success');
+            updateDeviceCountInfo();
+            updateReconnectTip();
+        }
+
+        // 保存设备配置到JSON文件
+        function saveDevicesToJson() {
+            const config = {
+                devices: DEVICES_CONFIG,
+                reconnectInterval: RECONNECT_INTERVAL,
+                dataRefreshInterval: DATA_REFRESH_INTERVAL
+            };
+            
+            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'devices-config.json';
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            showStatusMessage('设备配置已保存到本地JSON文件！', 'success');
+        }
+
+        // 清空设备表单
+        function clearDeviceForm() {
+            document.getElementById('deviceIdInput').value = '';
+            document.getElementById('deviceNameInput').value = '';
+            document.getElementById('deviceIpInput').value = '';
+            document.getElementById('deviceColorInput').value = '#FF0000';
+            document.getElementById('colorValue').textContent = '#FF0000';
+            selectedDeviceId = null;
+        }
+
+        // ========== 原有功能 ==========
+        // 切换设备
+        function switchDevice() {
+            const select = document.getElementById('deviceSelect');
+            currentDeviceId = select.value;
+            
+            if (currentDeviceId === "all") {
+                document.getElementById('currentDeviceInfo').textContent = "当前设备：未选择";
+                clearDeviceDataPanel();
+                
+                // 隐藏所有设备图标
+                DEVICES_CONFIG.forEach(device => {
+                    if (deviceMarkers[device.id]) {
+                        deviceMarkers[device.id].hide();
+                    }
+                });
+                
+                // 隐藏设备状态卡片
+                const legend = document.getElementById('deviceLegend');
+                if (legend.classList.contains('show')) {
+                    legend.classList.remove('show');
+                }
+            } else {
+                const device = DEVICES_CONFIG.find(d => d.id === currentDeviceId);
+                document.getElementById('currentDeviceInfo').textContent = `当前设备：${device.name} (${device.id})`;
+                
+                if (deviceData[currentDeviceId]) {
+                    updateDataPanel(deviceData[currentDeviceId]);
+                } else {
+                    clearDeviceDataPanel();
+                }
+                
+                if (map && deviceData[currentDeviceId]) {
+                    const resolved = resolveDeviceLocation(deviceData[currentDeviceId]);
+                    if (isEffectiveCoord(resolved.lat, resolved.lng)) {
+                        const lnglat = [parseFloat(resolved.lng), parseFloat(resolved.lat)];
+                        map.panTo(lnglat);
+                        map.setZoom(17);
+                    }
+                    
+                    // 显示当前设备的标记，隐藏其他设备的标记
+                    DEVICES_CONFIG.forEach(device => {
+                        if (deviceMarkers[device.id]) {
+                            if (device.id === currentDeviceId) {
+                                deviceMarkers[device.id].show();
+                            } else {
+                                deviceMarkers[device.id].hide();
+                            }
+                        }
+                    });
+                }
+            }
+
+            // 更新温湿度显示
+            updateDeviceCountInfo();
+
+            // 如果正在显示轨迹，则切换后刷新轨迹显示范围
+            if (trackVisible) {
+                refreshTrackDisplay({ fitView: false });
+            }
+        }
+
+        // 清空数据面板
+        function clearDeviceDataPanel() {
+            document.getElementById('latitude').textContent = '--';
+            document.getElementById('longitude').textContent = '--';
+            document.getElementById('gpstime').textContent = '--';
+            document.getElementById('satellite').textContent = '--';
+            document.getElementById('distance').textContent = '--';
+            document.getElementById('distanceUnit').textContent = '米';
+            
+            const speedEl = document.getElementById('speed');
+            if (speedEl) speedEl.textContent = '--';
+            const speedStatusEl = document.getElementById('speedStatus');
+            if (speedStatusEl) {
+                speedStatusEl.textContent = '行驶状态：停止';
+                speedStatusEl.style.color = '#6b7280';
+            }
+
+            const gpsStatusCard = document.getElementById('gpsStatusCard');
+            gpsStatusCard.className = 'status-card';
+            gpsStatusCard.querySelector('h4').textContent = '未选择设备';
+            document.getElementById('gpsStatusDesc').textContent = '请选择具体设备查看详情';
+            updateGPSSignalUI(0);
+            
+            const vibrationCard = document.getElementById('vibrationCard');
+            vibrationCard.className = 'status-card';
+            vibrationCard.querySelector('h4').textContent = '未选择设备';
+            document.getElementById('vibrationDesc').textContent = '请选择具体设备查看震动信息';
+            
+            const statusCard = document.getElementById('statusCard');
+            statusCard.className = 'status-card';
+            statusCard.querySelector('h4').textContent = '未选择设备';
+            document.getElementById('statusDesc').textContent = '请选择具体设备查看状态';
+        }
+
+        // 显示所有设备（只显示在线设备；再次点击关闭设备状态卡片）
+        function showAllDevices() {
+            const btn = document.querySelector('.btn-all-devices');
+            btn.style.transform = 'scale(1.1)';
+            setTimeout(() => { btn.style.transform = 'scale(1)'; }, 300);
+
+            const legend = document.getElementById('deviceLegend');
+
+            // 如果状态卡片已展开，则此点击关闭它并返回
+            if (legend.classList.contains('show')) {
+                legend.classList.remove('show');
+                // 隐藏所有设备图标
+                DEVICES_CONFIG.forEach(device => {
+                    if (deviceMarkers[device.id]) {
+                        deviceMarkers[device.id].hide();
+                    }
+                });
+                return;
+            }
+
+            if (!map) return;
+
+            // 仅显示在线设备的标记
+            DEVICES_CONFIG.forEach(device => {
+                if (!deviceMarkers[device.id]) return;
+                const data = deviceData[device.id] || {};
+                if (data.online && isEffectiveCoord(data.lat, data.lng)) {
+                    deviceMarkers[device.id].show();
+                } else {
+                    deviceMarkers[device.id].hide();
+                }
+            });
+
+            // 更新并显示设备状态卡片（设备标识）
+            initDeviceLegend();
+            legend.classList.add('show');
+
+            // 调整视野至所有在线设备
+            const positions = [];
+            DEVICES_CONFIG.forEach(device => {
+                const data = deviceData[device.id] || {};
+                if (data.online && isEffectiveCoord(data.lat, data.lng)) {
+                    positions.push([parseFloat(data.lng), parseFloat(data.lat)]);
+                }
+            });
+            if (positions.length > 0) {
+                map.setFitView(positions, [50, 50, 50, 50]);
+            }
+
+            // 保持当前下拉选择与当前设备，不做重置
+        }
+
+        // 初始化地图
+        function initMap() {
+            const loadingEl = document.getElementById('mapLoading');
+            const errorEl = document.getElementById('mapError');
+            
+            try {
+                map = new AMap.Map('map', {
+                    zoom: 15,
+                    center: [116.397428, 39.90923],
+                    resizeEnable: true,
+                    layers: [new AMap.TileLayer.RoadNet()],
+                    mapStyle: 'amap://styles/normal'
+                });
+
+                map.on('complete', function() {
+                    loadingEl.style.display = 'none';
+                    errorEl.style.display = 'none';
+                    // 避免初次渲染未铺满/需要刷新：强制触发一次resize
+                    setTimeout(() => {
+                        try { map.resize(); } catch (e) {}
+                        tryInitialFitView();
+                    }, 150);
+                    try { if (typeof map.setMapStyle === 'function') { map.setMapStyle('amap://styles/normal'); } } catch(e) {}
+                    
+                    // 绘制校园边界红框
+                    drawCampusBoundary();
+                });
+
+                map.on('error', function(e) {
+                    loadingEl.style.display = 'none';
+                    errorEl.style.display = 'flex';
+                    document.getElementById('mapErrorText').textContent = `地图加载失败：${e.message}`;
+                });
+
+                // 添加地图控件
+                map.addControl(new AMap.Scale());
+                map.addControl(new AMap.ToolBar({
+                    position: 'RB'
+                }));
+
+            } catch (e) {
+                loadingEl.style.display = 'none';
+                errorEl.style.display = 'flex';
+                document.getElementById('mapErrorText').textContent = `地图初始化失败：${e.message}`;
+                console.error('地图初始化失败：', e);
+            }
+        }
+
+        // 获取用户位置（优先GPS，再网络，再IP城市中心）
+        function getUserLocation() {
+            if (!navigator.geolocation) {
+                console.log('浏览器不支持地理定位');
+                return amapLocateFallback();
+            }
+
+            watchId = navigator.geolocation.watchPosition(
+                function(position) {
+                    userPosition = {
+                        lng: position.coords.longitude,
+                        lat: position.coords.latitude,
+                        accuracy: position.coords.accuracy,
+                        isGCJ02: false
+                    };
+                    
+                    currentLocationType = position.coords.accuracy < 50 ? "GPS高精度" : "普通定位";
+                    document.getElementById('locationType').textContent = `定位方式：${currentLocationType}`;
+
+                    const gcj02Pos = CoordTransform.wgs84togcj02(userPosition.lng, userPosition.lat);
+                    
+                    if (userMarker) {
+                        userMarker.setPosition(gcj02Pos);
+                    } else {
+                        userMarker = new AMap.Marker({
+                            position: gcj02Pos,
+                            icon: new AMap.Icon({
+                                size: new AMap.Size(30, 30),
+                                image: 'https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png',
+                                imageSize: new AMap.Size(30, 30)
+                            }),
+                            zIndex: 100,
+                            title: '我的位置'
+                        });
+                        userMarker.addTo(map);
+                    }
+
+                    updateAllDeviceDistances();
+                    tryInitialFitView();
+
+                    // 若精度不理想，进一步尝试网络定位
+                    if (position.coords.accuracy > 100) {
+                        amapLocateFallback(true);
+                    }
+                },
+                function(error) {
+                    console.error('获取位置失败：', error);
+                    let errorMsg = '';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg = '用户拒绝了地理定位请求';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg = '位置信息不可用';
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg = '获取位置超时';
+                            break;
+                        case error.UNKNOWN_ERROR:
+                            errorMsg = '未知错误';
+                            break;
+                    }
+                    document.getElementById('locationType').textContent = `定位方式：未知 (${errorMsg})`;
+                    amapLocateFallback();
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    maximumAge: 2000
+                }
+            );
+        }
+
+        // 高德网络定位/城市中心兜底
+        function amapLocateFallback(isDegrade = false) {
+            if (!AMap || !map) return;
+            AMap.plugin(['AMap.Geolocation', 'AMap.CitySearch'], function() {
+                const geo = new AMap.Geolocation({
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    zoomToAccuracy: false
+                });
+                geo.getCurrentPosition(function(status, result) {
+                    if (status === 'complete' && result.position) {
+                        userPosition = { 
+                            lng: result.position.lng, 
+                            lat: result.position.lat, 
+                            accuracy: result.accuracy || 200,
+                            isGCJ02: true
+                        };
+                        currentLocationType = isDegrade ? '网络定位(降级)' : '网络定位';
+                        document.getElementById('locationType').textContent = `定位方式：${currentLocationType}`;
+                        if (userMarker) {
+                            userMarker.setPosition([userPosition.lng, userPosition.lat]);
+                        } else {
+                            userMarker = new AMap.Marker({
+                                position: [userPosition.lng, userPosition.lat],
+                                zIndex: 100,
+                                title: '我的位置'
+                            });
+                            userMarker.addTo(map);
+                        }
+                        updateAllDeviceDistances();
+                        tryInitialFitView();
+                    } else {
+                        const city = new AMap.CitySearch();
+                        city.getLocalCity(function(s, res) {
+                            if (s === 'complete' && (res.center || res.rectangle)) {
+                                let center = null;
+                                if (res.center) {
+                                    center = [res.center.lng, res.center.lat];
+                                } else if (res.rectangle) {
+                                    const first = res.rectangle.split(';')[0].split(',').map(Number);
+                                    center = first.length === 2 ? first : null;
+                                }
+                                if (center) {
+                                    map.panTo(center);
+                                    map.setZoom(12);
+                                    currentLocationType = 'IP定位(城市中心)';
+                                    document.getElementById('locationType').textContent = `定位方式：${currentLocationType}`;
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+        }
+
+        // 检查坐标是否有效
+        function isEffectiveCoord(lat, lng) {
+            if (lat === undefined || lng === undefined) return false;
+            const latNum = parseFloat(lat);
+            const lngNum = parseFloat(lng);
+            return !isNaN(latNum) && !isNaN(lngNum) && latNum !== 0 && lngNum !== 0;
+        }
+
+        // 计算两点之间的距离（米）
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371000;
+            const toRad = (d) => d * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLng = toRad(lng2 - lng1);
+            const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2) ** 2;
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // 计算方向角度（从用户位置指向设备位置）
+        function calculateDirection(lat1, lng1, lat2, lng2) {
+            const toRad = (d) => d * Math.PI / 180;
+            const toDeg = (r) => r * 180 / Math.PI;
+            const dLng = toRad(lng2 - lng1);
+            const y = Math.sin(dLng) * Math.cos(toRad(lat2));
+            const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - 
+                      Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
+            let bearing = toDeg(Math.atan2(y, x));
+            bearing = (bearing + 360) % 360;
+            return bearing;
+        }
+
+        // 将角度转换为方向描述
+        function getDirectionText(angle) {
+            const directions = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+            const index = Math.round(angle / 45) % 8;
+            return directions[index];
+        }
+
+        // 格式化距离显示
+        function formatDistance(meters) {
+            if (meters < 100) {
+                return Math.round(meters) + ' 米';
+            } else if (meters < 1000) {
+                return Math.round(meters / 10) * 10 + ' 米';
+            } else {
+                return (meters / 1000).toFixed(1) + ' 公里';
+            }
+        }
+
+        // 寻车导航功能
+        function startNavigation() {
+            if (currentDeviceId === 'all' || !currentDeviceId) {
+                alert('请先选择一个具体的设备！');
+                return;
+            }
+
+            if (!userPosition) {
+                alert('无法获取您的位置，请确保已授权定位权限！');
+                return;
+            }
+
+            if (userPosition.accuracy && userPosition.accuracy > 100) {
+                if (!confirm(`您的当前位置精度较低（约 ${Math.round(userPosition.accuracy)} 米），是否继续导航？`)) {
+                    return;
+                }
+            }
+
+            const device = DEVICES_CONFIG.find(d => d.id === currentDeviceId);
+            if (!device) {
+                alert('设备不存在！');
+                return;
+            }
+
+            const data = deviceData[currentDeviceId];
+            if (!data || !data.online) {
+                alert('设备不在线，无法导航！');
+                return;
+            }
+
+            const resolved = resolveDeviceLocation(data);
+            if (!isEffectiveCoord(resolved.lat, resolved.lng)) {
+                alert('设备位置无效，无法导航！');
+                return;
+            }
+
+            let userLng = userPosition.lng;
+            let userLat = userPosition.lat;
+
+            if (!userPosition.isGCJ02) {
+                const gcj02 = CoordTransform.wgs84togcj02(userLng, userLat);
+                userLng = gcj02[0];
+                userLat = gcj02[1];
+            }
+
+            const deviceLng = parseFloat(resolved.lng);
+            const deviceLat = parseFloat(resolved.lat);
+
+            let calcUserLat = userPosition.lat;
+            let calcUserLng = userPosition.lng;
+            let calcDeviceLat = deviceLat;
+            let calcDeviceLng = deviceLng;
+
+            if (!userPosition.isGCJ02) {
+                const deviceWgs84 = CoordTransform.gcj02towgs84(deviceLng, deviceLat);
+                calcDeviceLng = deviceWgs84[0];
+                calcDeviceLat = deviceWgs84[1];
+            }
+
+            const distance = calculateDistance(calcUserLat, calcUserLng, calcDeviceLat, calcDeviceLng);
+            const direction = calculateDirection(calcUserLat, calcUserLng, calcDeviceLat, calcDeviceLng);
+            const directionText = getDirectionText(direction);
+            const formattedDistance = formatDistance(distance);
+
+            const navModes = [
+                { value: 0, name: '步行导航', icon: '🚶' },
+                { value: 1, name: '驾车导航', icon: '🚗' },
+                { value: 2, name: '骑行导航', icon: '🚲' }
+            ];
+
+            const userChoice = confirm(
+                `📍 车辆信息：${device.name}\n` +
+                `📏 距离您：${formattedDistance}\n` +
+                `🧭 方向：${directionText} (${Math.round(direction)}°)\n\n` +
+                `点击确定开始步行导航，点击取消选择其他导航方式`
+            );
+
+            let mode = 0;
+            
+            if (!userChoice) {
+                const modeChoice = prompt(
+                    `请选择导航方式：\n` +
+                    `0 - 🚶 步行导航\n` +
+                    `1 - 🚗 驾车导航\n` +
+                    `2 - 🚲 骑行导航\n\n` +
+                    `请输入数字 (0/1/2)，默认步行导航`
+                );
+                
+                if (modeChoice !== null) {
+                    const choiceNum = parseInt(modeChoice);
+                    if (!isNaN(choiceNum) && choiceNum >= 0 && choiceNum <= 2) {
+                        mode = choiceNum;
+                    }
+                } else {
+                    return;
+                }
+            }
+
+            const navigationUrl = `https://uri.amap.com/navigation?from=${userLng},${userLat},我的位置&to=${deviceLng},${deviceLat},${encodeURIComponent(device.name)}&mode=${mode}&coordinate=gaode&callnative=0`;
+            window.open(navigationUrl, '_blank');
+        }
+
+        // 获取设备数据
+        async function fetchDeviceData(deviceId) {
+            const device = DEVICES_CONFIG.find(d => d.id === deviceId);
+            if (!device) {
+                console.warn(`[获取设备数据] 设备${deviceId}不存在`);
+                return;
+            }
+
+            try {
+                stopReconnect(deviceId);
+
+                const response = await fetchWithTimeout(`${API_BASE_URL}/api/device/${encodeURIComponent(deviceId)}`, {
+                    method: 'GET',
+                    cache: 'no-cache',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }, 5000);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log(`设备${deviceId}后端返回数据：`, result); 
+                
+                // 检查返回数据格式
+                if (!result || result.code !== 0) {
+                    throw new Error(`API返回错误：${result.msg || '未知错误'}`);
+                }
+                
+                // 双重判断在线状态
+                const lastOnline = result.data?.lastOnline || 0;
+                const timeDiff = Date.now() - lastOnline;
+                const isOnlineByTime = timeDiff < ONLINE_GRACE_MS;
+                const finalIsOnline = result.data?.isOnline === true || isOnlineByTime;
+
+                // 速度只接受有效值，缺失时保持上一次，避免瞬时 0 闪现
+                const prev = deviceData[deviceId] || {};
+                const prevSpeed = Number.isFinite(parseFloat(prev.speed)) ? parseFloat(prev.speed) : null;
+                const prevSpeedTs = prev.speedTs || 0;
+                const nowTs = Date.now();
+                const speedInfo = SpeedUtils.normalizeSpeed({
+                    incomingSpeed: result.data?.speed,
+                    prevSpeed,
+                    prevSpeedTs,
+                    online: finalIsOnline,
+                    now: nowTs,
+                    holdMs: SPEED_HOLD_MS
+                });
+                const data = {
+                    online: finalIsOnline,
+                    lat: result.data?.lat ?? null,
+                    lng: result.data?.lng ?? null,
+                    gps_valid: Boolean(result.data?.gps_valid),
+                    // 蓝牙定位数据
+                    ble_lat: result.data?.ble_lat ?? null,
+                    ble_lng: result.data?.ble_lng ?? null,
+                    ble_valid: Boolean(result.data?.ble_valid),
+                    ble_age_ms: result.data?.ble_age_ms ?? null,
+                    // 校园外状态
+                    outside_campus: Boolean(result.data?.outside_campus),
+                    time: lastOnline,
+                    satellite: result.data?.satellite ?? null,
+                    vibration: result.data?.vibration ?? null,
+                    speed: speedInfo.speed,
+                    speedTs: speedInfo.speedTs,
+                    // 温湿度数据
+                    temp: result.data?.temp ?? null,
+                    hum: result.data?.hum ?? null,
+                    status: result.data?.status ?? 'idle',
+                    lastOnline: lastOnline
+                };
+
+                deviceData[deviceId] = data;
+                fetchFailures[deviceId] = 0;
+                offlineNotified[deviceId] = false; // 重置离线提示标志
+                localStorage.removeItem(`offlineNotified_${deviceId}`); // 清除localStorage中的标志
+                console.log(`设备${deviceId}最终在线状态：`, data.online); 
+
+                // 只有当当前设备被选中时，才更新设备标记
+                if (currentDeviceId === deviceId) {
+                    updateDeviceMarker(deviceId, data);
+                } else {
+                    // 隐藏未选中设备的标记
+                    if (deviceMarkers[deviceId]) {
+                        deviceMarkers[deviceId].hide();
+                    }
+                }
+
+                if (currentDeviceId === deviceId) {
+                    updateDataPanel(data);
+                    
+                    // 检查车辆是否在校园内（用于GPS定位和蓝牙定位）
+                    const resolved = resolveDeviceLocation(data);
+                    if (isEffectiveCoord(resolved.lat, resolved.lng)) {
+                        const lat = parseFloat(resolved.lat);
+                        const lng = parseFloat(resolved.lng);
+                        
+                        // 检查车辆是否离开校园
+                        if (!isDeviceInCampus(lat, lng)) {
+                            // 使用localStorage确保每个设备只显示一次弹窗
+                            const storageKey = `outsideCampusNotified_${deviceId}`;
+                            const hasNotified = localStorage.getItem(storageKey) === 'true';
+                            
+                            if (!hasNotified) {
+                                showStatusMessage('🚨 车辆离开校园：设备已离开兰州工业学院校园区域，请及时处理！', 'error');
+                                localStorage.setItem(storageKey, 'true'); // 标记已显示
+                            }
+                        } else {
+                            // 车辆回到校园，清除通知标记
+                            const storageKey = `outsideCampusNotified_${deviceId}`;
+                            if (localStorage.getItem(storageKey) === 'true') {
+                                localStorage.removeItem(storageKey);
+                            }
+                        }
+                    }
+                }
+
+                initDeviceSelector();
+                renderDeviceList();
+                initDeviceLegend();
+                updateDeviceCountInfo();
+                updateRefreshTime();
+                updateReconnectTip();
+
+            } catch (error) {
+                console.error(`获取设备 ${deviceId} 数据失败：`, error);
+                fetchFailures[deviceId] = (fetchFailures[deviceId] || 0) + 1;
+                
+                // 不显示连接失败弹窗
+                
+                const prev = deviceData[deviceId];
+                const last = prev && prev.lastOnline ? prev.lastOnline : 0;
+                const recent = Date.now() - last < ONLINE_GRACE_MS;
+                if (recent || fetchFailures[deviceId] < 3) {
+                    return;
+                }
+                deviceData[deviceId] = { online: false, lat: null, lng: null, gps_valid: false, wifi_lat: null, wifi_lng: null, satellite: null, vibration: null, speed: null, speedTs: 0 };
+                if (deviceMarkers[deviceId]) { deviceMarkers[deviceId].hide(); }
+                startReconnect(deviceId);
+                initDeviceSelector();
+                renderDeviceList();
+                initDeviceLegend();
+                updateDeviceCountInfo();
+                updateReconnectTip();
+                if (currentDeviceId === deviceId) { updateOfflineStatus(deviceId); }
+            }
+        }
+
+        // 更新设备标记
+        // 位置变化阈值（米）- 降低到0.5米，确保精确实时更新
+        const POSITION_UPDATE_THRESHOLD = 0.5;
+
+        function updateDeviceMarker(deviceId, data) {
+            // 只有当当前设备被选中时，才显示设备标记
+            if (currentDeviceId !== deviceId) {
+                if (deviceMarkers[deviceId]) {
+                    deviceMarkers[deviceId].hide();
+                }
+                return;
+            }
+            
+            const device = DEVICES_CONFIG.find(d => d.id === deviceId);
+            const resolved = resolveDeviceLocation(data);
+            if (!device) {
+                if (deviceMarkers[deviceId]) {
+                    deviceMarkers[deviceId].hide();
+                }
+                return;
+            }
+            
+            // 检查GPS定位的有效性
+            if (deviceLocationMode === 'gps' && !data.gps_valid) {
+                // GPS模式下，GPS定位无效，隐藏设备图标
+                if (deviceMarkers[deviceId]) {
+                    deviceMarkers[deviceId].hide();
+                }
+                return;
+            }
+            
+            // 检查是否有有效坐标
+            if (!isEffectiveCoord(resolved.lat, resolved.lng)) {
+                // 如果没有有效坐标
+                if (deviceLocationMode === 'gps') {
+                    // GPS模式下，没有有效坐标，隐藏设备图标
+                    if (deviceMarkers[deviceId]) {
+                        deviceMarkers[deviceId].hide();
+                    }
+                    return;
+                } else {
+                    // 非GPS模式下，使用默认校园坐标
+                    resolved.lat = 36.53000;
+                    resolved.lng = 103.72200;
+                    resolved.source = 'ble';
+                }
+            }
+
+            // 只有蓝牙定位才强制限制在校园区域内，GPS定位保持原始位置
+            let finalLat = resolved.lat;
+            let finalLng = resolved.lng;
+            
+            if (resolved.source === 'ble') {
+                // 蓝牙定位：确保在校园边界内
+                const campusPos = ensurePositionInCampus(resolved.lat, resolved.lng);
+                finalLat = campusPos.lat;
+                finalLng = campusPos.lng;
+            }
+            
+            const lnglat = [parseFloat(finalLng), parseFloat(finalLat)];
+
+            // 根据车辆状态设置标记颜色
+            let markerColor = device.color;
+            let markerTitle = `${device.name} (${device.id})`;
+            
+            if (data.status === 'in_use') {
+                markerColor = '#10b981'; // 绿色 - 使用中
+                markerTitle += ' - 使用中';
+            } else if (data.status === 'abnormal') {
+                markerColor = '#ef4444'; // 红色 - 异常
+                markerTitle += ' - 异常';
+            } else if (data.status === 'idle') {
+                markerColor = device.color; // 设备默认颜色 - 空闲
+                markerTitle += ' - 空闲';
+            }
+
+            if (!deviceMarkers[deviceId]) {
+                // 创建自定义标记
+                const markerContent = document.createElement('div');
+                markerContent.style.cssText = `
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    background-color: ${markerColor};
+                    border: 2px solid white;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    color: white;
+                    font-size: 12px;
+                    font-weight: bold;
+                `;
+                markerContent.textContent = device.id.slice(-2);
+
+                deviceMarkers[deviceId] = new AMap.Marker({
+                    position: lnglat,
+                    content: markerContent,
+                    zIndex: 50,
+                    title: markerTitle
+                });
+                deviceMarkers[deviceId].addTo(map);
+
+                // 添加点击事件
+                deviceMarkers[deviceId].on('click', () => {
+                    document.getElementById('deviceSelect').value = deviceId;
+                    switchDevice();
+                });
+
+                // 新标记创建时才调用视图调整
+                tryInitialFitView();
+
+            } else {
+                // 更新标记颜色和标题
+                const markerContent = document.createElement('div');
+                markerContent.style.cssText = `
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    background-color: ${markerColor};
+                    border: 2px solid white;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    color: white;
+                    font-size: 12px;
+                    font-weight: bold;
+                `;
+                markerContent.textContent = device.id.slice(-2);
+                
+                deviceMarkers[deviceId].setContent(markerContent);
+                deviceMarkers[deviceId].setTitle(markerTitle);
+                
+                // 只有当位置变化超过阈值时才更新标记位置
+                const currentPosition = deviceMarkers[deviceId].getPosition();
+                if (currentPosition) {
+                    const currentLnglat = [currentPosition.lng, currentPosition.lat];
+                    const distance = calculateDistance(
+                        currentLnglat[1], currentLnglat[0],
+                        lnglat[1], lnglat[0]
+                    );
+                    
+                    // 降低阈值，确保精确实时更新
+                    if (distance >= POSITION_UPDATE_THRESHOLD) {
+                        deviceMarkers[deviceId].setPosition(lnglat);
+                    }
+                } else {
+                    // 如果没有当前位置，直接更新
+                    deviceMarkers[deviceId].setPosition(lnglat);
+                }
+                // 无论位置是否变化，都要显示设备图标（修复切换定位模式后图标不显示的问题）
+                deviceMarkers[deviceId].show();
+            }
+        }
+
+        // 更新数据面板
+        function updateDataPanel(data) {
+            const resolved = resolveDeviceLocation(data);
+            const hasCoord = data.online && isEffectiveCoord(resolved.lat, resolved.lng);
+            document.getElementById('latitude').textContent = hasCoord ? Number(resolved.lat).toFixed(6) : '--';
+            document.getElementById('longitude').textContent = hasCoord ? Number(resolved.lng).toFixed(6) : '--';
+            document.getElementById('gpstime').textContent = data.online ? formatGpsTime(data.time || data.lastOnline) : '--';
+            document.getElementById('satellite').textContent = (data.online && data.satellite !== null && resolved.source === 'gps') ? data.satellite : '--';
+
+            // 更新定位状态
+            const gpsStatusCard = document.getElementById('gpsStatusCard');
+            const gpsStatusDesc = document.getElementById('gpsStatusDesc');
+            
+            if (data.online) {
+                if (hasCoord) {
+                    if (resolved.source === 'gps') {
+                        // GPS定位
+                        const satelliteCount = parseInt(data.satellite || 0);
+                        if (satelliteCount >= 4) {
+                            gpsStatusCard.className = 'status-card';
+                            gpsStatusCard.querySelector('h4').textContent = 'GPS已连接';
+                            gpsStatusDesc.textContent = `当前卫星数：${satelliteCount}颗，定位正常`;
+                        } else if (satelliteCount > 0) {
+                            gpsStatusCard.className = 'status-card warning';
+                            gpsStatusCard.querySelector('h4').textContent = 'GPS信号弱';
+                            gpsStatusDesc.textContent = `当前卫星数：${satelliteCount}颗，建议移至开阔地带`;
+                        }
+                    } else if (resolved.source === 'ble') {
+                        // 蓝牙定位
+                        gpsStatusCard.className = 'status-card';
+                        gpsStatusCard.querySelector('h4').textContent = '蓝牙定位';
+                        gpsStatusDesc.textContent = '使用蓝牙定位，定位正常';
+                    }
+                } else {
+                    gpsStatusCard.className = 'status-card alert';
+                    gpsStatusCard.querySelector('h4').textContent = '未定位';
+                    gpsStatusDesc.textContent = '无法获取有效定位数据';
+                }
+            } else {
+                gpsStatusCard.className = 'status-card alert';
+                gpsStatusCard.querySelector('h4').textContent = '设备离线';
+                gpsStatusDesc.textContent = '无法连接到设备，请检查网络或设备状态';
+            }
+            
+            // 更新GPS信号强度（仅当使用GPS定位时）
+            if (resolved.source === 'gps') {
+                updateGPSSignalUI(hasCoord ? parseInt(data.satellite || 0) : 0);
+            } else {
+                // 蓝牙定位时隐藏GPS信号强度
+                document.getElementById('gpsSignal').style.display = 'none';
+            }
+
+            // 更新震动报警信息
+            const vibrationCard = document.getElementById('vibrationCard');
+            const vibrationDesc = document.getElementById('vibrationDesc');
+            
+            if (data.online && data.vibration !== null && parseInt(data.vibration) > 0) {
+                vibrationCard.className = 'status-card alert';
+                vibrationCard.querySelector('h4').textContent = '⚠️ 震动报警';
+                vibrationDesc.textContent = `检测到强烈震动，可能存在异常移动！震动值：${data.vibration}`;
+                playAlertSound();
+            } else if (data.online) {
+                vibrationCard.className = 'status-card';
+                vibrationCard.querySelector('h4').textContent = '无震动';
+                vibrationDesc.textContent = '未检测到有效震动，车辆安全';
+            } else {
+                vibrationCard.className = 'status-card alert';
+                vibrationCard.querySelector('h4').textContent = '设备离线';
+                vibrationDesc.textContent = '无法获取震动信息';
+            }
+            
+            // 更新车辆使用状态
+            const statusCard = document.getElementById('statusCard');
+            const statusDesc = document.getElementById('statusDesc');
+            
+            const deviceId = currentDeviceId || 'all';
+            
+            if (data.online) {
+                switch(data.status) {
+                    case 'in_use':
+                        statusCard.className = 'status-card';
+                        statusCard.querySelector('h4').textContent = '🚗 车辆使用中';
+                        statusDesc.textContent = '车辆正在被使用，状态正常';
+                        break;
+                    case 'abnormal':
+                        statusCard.className = 'status-card alert';
+                        statusCard.querySelector('h4').textContent = '⚠️ 车辆异常';
+                        statusDesc.textContent = '车辆可能存在异常情况，请注意检查';
+                        break;
+                    case 'idle':
+                    default:
+                        statusCard.className = 'status-card';
+                        statusCard.querySelector('h4').textContent = '🅿️ 车辆空闲';
+                        statusDesc.textContent = '车辆当前空闲，可正常使用';
+                        break;
+                }
+                // 重置校园外提示标记
+                if (outsideCampusNotified[deviceId]) {
+                    delete outsideCampusNotified[deviceId];
+                }
+            } else {
+                statusCard.className = 'status-card alert';
+                statusCard.querySelector('h4').textContent = '设备离线';
+                statusDesc.textContent = '无法获取车辆状态信息';
+                // 重置校园外提示标记
+                if (outsideCampusNotified[deviceId]) {
+                    delete outsideCampusNotified[deviceId];
+                }
+            }
+
+            // 更新速度
+            const speedEl = document.getElementById('speed');
+            const speedStatusEl = document.getElementById('speedStatus');
+            if (speedEl && speedStatusEl) {
+                if (data.online) {
+                    const speedVal = Number.isFinite(data.speed) ? data.speed : null;
+                    if (speedVal !== null) {
+                        const deviceId = currentDeviceId || 'all';
+                        const prevDisplay = Number.isFinite(speedDisplayCache[deviceId]) ? speedDisplayCache[deviceId] : speedVal;
+                        // 速度渲染采用上一有效值到新值的短动画过渡
+                        if (Math.abs(speedVal - prevDisplay) <= SPEED_EPS) {
+                            speedEl.textContent = speedVal.toFixed(1);
+                        } else {
+                            animateSpeedValue(deviceId, speedEl, prevDisplay, speedVal);
+                        }
+                        speedDisplayCache[deviceId] = speedVal;
+                        if (speedVal > 2.0) {
+                            speedStatusEl.textContent = '行驶状态：行驶中';
+                            speedStatusEl.style.color = '#10b981';
+                        } else {
+                            speedStatusEl.textContent = '行驶状态：静止/停止';
+                            speedStatusEl.style.color = '#6b7280';
+                        }
+                    } else {
+                        speedEl.textContent = '--';
+                        speedStatusEl.textContent = '行驶状态：未知';
+                        speedStatusEl.style.color = '#6b7280';
+                    }
+                } else {
+                    speedEl.textContent = '--';
+                    speedStatusEl.textContent = '行驶状态：未知';
+                    speedStatusEl.style.color = '#6b7280';
+                }
+            }
+
+            // 更新距离
+            updateDeviceDistance(data, resolved);
+
+            // 更新温湿度显示
+            const temperatureEl = document.getElementById('temperature');
+            const humidityEl = document.getElementById('humidity');
+            if (temperatureEl && humidityEl) {
+                if (data.online) {
+                    if (data.temp !== null && !isNaN(data.temp)) {
+                        temperatureEl.textContent = Number(data.temp).toFixed(1);
+                    } else {
+                        temperatureEl.textContent = '--';
+                    }
+                    if (data.hum !== null && !isNaN(data.hum)) {
+                        humidityEl.textContent = Number(data.hum).toFixed(1);
+                    } else {
+                        humidityEl.textContent = '--';
+                    }
+                } else {
+                    temperatureEl.textContent = '--';
+                    humidityEl.textContent = '--';
+                }
+            }
+        }
+
+        // 更新GPS信号UI
+        function updateGPSSignalUI(satelliteCount) {
+            const signalBars = document.querySelectorAll('#gpsSignal .signal-bar');
+            const activeBars = Math.min(Math.floor((satelliteCount || 0) / 2), 5);
+
+            signalBars.forEach((bar, index) => {
+                bar.classList.remove('active', 'warning', 'alert');
+                
+                if (index < activeBars) {
+                    if (activeBars >= 4) {
+                        bar.classList.add('active');
+                    } else if (activeBars >= 2) {
+                        bar.classList.add('warning');
+                    } else {
+                        bar.classList.add('alert');
+                    }
+                }
+            });
+        }
+
+        function formatGpsTime(ts) {
+            if (!ts) return '--';
+            const d = new Date(ts);
+            if (Number.isNaN(d.getTime())) return '--';
+            return d.toLocaleString();
+        }
+
+        function resolveDeviceLocation(data) {
+            console.log('resolveDeviceLocation called with data:', data);
+            console.log('Current deviceLocationMode:', deviceLocationMode);
+            
+            const gpsLat = parseFloat(data?.lat);
+            const gpsLng = parseFloat(data?.lng);
+            const gpsOk = data?.gps_valid && isEffectiveCoord(gpsLat, gpsLng);
+            console.log('GPS data:', { gpsLat, gpsLng, gpsOk });
+            
+            // 检查蓝牙定位
+            const bleLat = parseFloat(data?.ble_lat);
+            const bleLng = parseFloat(data?.ble_lng);
+            const bleOk = data?.ble_valid && isEffectiveCoord(bleLat, bleLng);
+            console.log('BLE data:', { bleLat, bleLng, bleOk });
+            
+            // 根据当前定位方式选择
+            let resultLat, resultLng, resultSource;
+            
+            if (deviceLocationMode === 'gps') {
+                // 强制使用GPS定位
+                if (gpsOk) {
+                    const [lng, lat] = CoordTransform.wgs84togcj02(gpsLng, gpsLat);
+                    resultLat = lat;
+                    resultLng = lng;
+                    resultSource = 'gps';
+                }
+                // GPS模式下，即使GPS无效也不切换到蓝牙定位
+            } else if (deviceLocationMode === 'ble' && bleOk) {
+                // 强制使用蓝牙定位
+                const [lng, lat] = CoordTransform.wgs84togcj02(bleLng, bleLat);
+                resultLat = lat;
+                resultLng = lng;
+                resultSource = 'ble';
+            } else if (deviceLocationMode === 'auto') {
+                // 自动模式：优先使用GPS
+                if (gpsOk) {
+                    const [lng, lat] = CoordTransform.wgs84togcj02(gpsLng, gpsLat);
+                    resultLat = lat;
+                    resultLng = lng;
+                    resultSource = 'gps';
+                } else if (bleOk) {
+                    const [lng, lat] = CoordTransform.wgs84togcj02(bleLng, bleLat);
+                    resultLat = lat;
+                    resultLng = lng;
+                    resultSource = 'ble';
+                }
+            }
+            
+            // 不强制限制位置在校园内，保持设备原始位置
+            // 只在标记显示时检查是否在校园内
+            console.log('Returning original location:', { lat: resultLat, lng: resultLng, source: resultSource });
+            return { lat: resultLat, lng: resultLng, source: resultSource };
+        }
+
+        // 定位方式切换函数
+        function setLocationMode(mode) {
+            console.log('定位方式切换为:', mode);
+            deviceLocationMode = mode;
+            // 保存到localStorage
+            localStorage.setItem('deviceLocationMode', mode);
+            // 手动触发一次数据刷新
+            manualRefresh();
+        }
+
+        // 更新设备距离
+        function updateDeviceDistance(data, resolved) {
+            if (!userPosition || !isEffectiveCoord(resolved.lat, resolved.lng)) {
+                document.getElementById('distance').textContent = '--';
+                document.getElementById('locationType').textContent = '定位方式：无可用定位';
+                return;
+            }
+
+            // 计算两点之间的距离（米）
+            const distance = calculateDistance(
+                userPosition.lat, userPosition.lng,
+                parseFloat(resolved.lat), parseFloat(resolved.lng)
+            );
+
+            // 显示距离
+            if (distance < 1000) {
+                document.getElementById('distance').textContent = distance.toFixed(0);
+                document.getElementById('distanceUnit').textContent = '米';
+            } else {
+                document.getElementById('distance').textContent = (distance / 1000).toFixed(2);
+                document.getElementById('distanceUnit').textContent = '公里';
+            }
+            if (resolved.source === 'gps') {
+                document.getElementById('locationType').textContent = '定位方式：GPS定位';
+            } else if (resolved.source === 'ble') {
+                document.getElementById('locationType').textContent = '定位方式：蓝牙定位';
+            } else {
+                document.getElementById('locationType').textContent = '定位方式：无可用定位';
+            }
+        }
+
+        // 更新所有设备距离
+        function updateAllDeviceDistances() {
+            if (!userPosition) return;
+
+            if (currentDeviceId !== "all" && deviceData[currentDeviceId]) {
+                updateDeviceDistance(deviceData[currentDeviceId], resolveDeviceLocation(deviceData[currentDeviceId]));
+            }
+        }
+
+        // 计算两点之间的距离（Haversine公式）
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // 地球半径（米）
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2); 
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+            return R * c;
+        }
+
+        // 显示状态消息
+        function showStatusMessage(message, type = 'info') {
+            // 创建消息容器
+            let messageContainer = document.getElementById('statusMessageContainer');
+            if (!messageContainer) {
+                messageContainer = document.createElement('div');
+                messageContainer.id = 'statusMessageContainer';
+                messageContainer.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    z-index: 10000;
+                    max-width: 300px;
+                `;
+                document.body.appendChild(messageContainer);
+            }
+
+            // 创建消息元素
+            const messageElement = document.createElement('div');
+            messageElement.style.cssText = `
+                padding: 12px 16px;
+                margin-bottom: 8px;
+                border-radius: 4px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                font-size: 14px;
+                font-weight: 500;
+                animation: slideIn 0.3s ease-out;
+            `;
+
+            // 根据类型设置样式
+            switch (type) {
+                case 'error':
+                    messageElement.style.backgroundColor = '#f8d7da';
+                    messageElement.style.color = '#721c24';
+                    messageElement.style.border = '1px solid #f5c6cb';
+                    break;
+                case 'warning':
+                    messageElement.style.backgroundColor = '#fff3cd';
+                    messageElement.style.color = '#856404';
+                    messageElement.style.border = '1px solid #ffeaa7';
+                    break;
+                case 'success':
+                    messageElement.style.backgroundColor = '#d4edda';
+                    messageElement.style.color = '#155724';
+                    messageElement.style.border = '1px solid #c3e6cb';
+                    break;
+                default:
+                    messageElement.style.backgroundColor = '#d1ecf1';
+                    messageElement.style.color = '#0c5460';
+                    messageElement.style.border = '1px solid #bee5eb';
+            }
+
+            messageElement.textContent = message;
+            messageContainer.appendChild(messageElement);
+
+            // 3秒后自动移除
+            setTimeout(() => {
+                messageElement.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => {
+                    if (messageElement.parentNode) {
+                        messageElement.parentNode.removeChild(messageElement);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // 添加动画样式
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            @keyframes slideOut {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // 启动重连
+        function startReconnect(deviceId) {
+            if (isReconnecting[deviceId]) return;
+
+            isReconnecting[deviceId] = true;
+            updateReconnectTip();
+
+            reconnectTimers[deviceId] = setInterval(() => {
+                fetchDeviceData(deviceId);
+            }, RECONNECT_INTERVAL);
+        }
+
+        // 停止重连
+        function stopReconnect(deviceId) {
+            if (!isReconnecting[deviceId]) return;
+
+            isReconnecting[deviceId] = false;
+            clearInterval(reconnectTimers[deviceId]);
+            delete reconnectTimers[deviceId];
+            
+            updateReconnectTip();
+        }
+
+        // 更新重连提示
+        function updateReconnectTip() {
+            const reconnectTip = document.getElementById('reconnectTip');
+            const offlineDeviceList = document.getElementById('offlineDeviceList');
+            
+            const offlineDevices = DEVICES_CONFIG.filter(device => {
+                const deviceStatus = deviceData[device.id];
+                return isReconnecting[device.id] || (deviceStatus && deviceStatus.online !== true);
+            });
+            
+            if (offlineDevices.length > 0) {
+                reconnectTip.classList.add('show');
+                offlineDeviceList.textContent = offlineDevices.map(d => d.name).join('、');
+            } else {
+                reconnectTip.classList.remove('show');
+                offlineDeviceList.textContent = '';
+            }
+        }
+
+        // 更新离线状态
+        function updateOfflineStatus(deviceId) {
+            document.getElementById('latitude').textContent = '--';
+            document.getElementById('longitude').textContent = '--';
+            document.getElementById('gpstime').textContent = '--';
+            document.getElementById('satellite').textContent = '--';
+            document.getElementById('distance').textContent = '--';
+
+            const speedEl = document.getElementById('speed');
+            if (speedEl) speedEl.textContent = '--';
+            const speedStatusEl = document.getElementById('speedStatus');
+            if (speedStatusEl) {
+                speedStatusEl.textContent = '行驶状态：未知';
+                speedStatusEl.style.color = '#6b7280';
+            }
+
+            const gpsStatusCard = document.getElementById('gpsStatusCard');
+            gpsStatusCard.className = 'status-card alert';
+            gpsStatusCard.querySelector('h4').textContent = '设备离线';
+            document.getElementById('gpsStatusDesc').textContent = '无法连接到设备，请检查网络或设备状态';
+            updateGPSSignalUI(0);
+
+            const vibrationCard = document.getElementById('vibrationCard');
+            vibrationCard.className = 'status-card alert';
+            vibrationCard.querySelector('h4').textContent = '设备离线';
+            document.getElementById('vibrationDesc').textContent = '无法获取震动信息';
+            
+            const statusCard = document.getElementById('statusCard');
+            statusCard.className = 'status-card alert';
+            statusCard.querySelector('h4').textContent = '设备离线';
+            document.getElementById('statusDesc').textContent = '无法获取车辆状态信息';
+        }
+
+        // 更新刷新时间
+        function updateRefreshTime() {
+            const now = new Date();
+            const timeStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+            document.getElementById('refreshInfo').textContent = `最后刷新时间：${timeStr} | 数据刷新频率：${DATA_REFRESH_INTERVAL/1000}秒/次`;
+        }
+
+        // 更新设备计数信息（离线设备列表 + 温湿度显示）
+        function updateDeviceCountInfo() {
+            const total = DEVICES_CONFIG.length;
+            let online = 0;
+            const offlineDevices = [];
+            
+            DEVICES_CONFIG.forEach(device => {
+                if (deviceData[device.id]?.online === true) {
+                    online++;
+                } else {
+                    offlineDevices.push(device);
+                }
+            });
+            
+            // 更新在线设备数
+            document.getElementById('deviceCountInfo').textContent = `在线设备数：${online} / 总设备数：${total}`;
+            
+            // 温湿度显示已移除
+
+            // 更新离线设备列表
+            const offlineInfo = document.getElementById('offlineDevicesInfo');
+            if (offlineInfo) {
+                if (offlineDevices.length > 0) {
+                    offlineInfo.style.display = 'block';
+                    offlineInfo.innerHTML = `⚠️ 以下设备离线：<span style="color: #ef4444; font-weight: bold;">${offlineDevices.map(d => d.name).join('、')}</span>`;
+                } else {
+                    offlineInfo.style.display = 'none';
+                }
+            }
+        }
+
+        // 温湿度显示已移除
+        // function applyTempHumPosition(position) { ... }
+        // function setTempHumPosition(posOrX, y) { ... }
+        // function initTempHumPosition() { ... }
+
+        // 初始化设备图例
+        function initDeviceLegend() {
+            const legendEl = document.getElementById('deviceLegend');
+            const legendContent = document.createElement('div');
+            
+            DEVICES_CONFIG.forEach(device => {
+                const isOnline = deviceData[device.id]?.online === true;
+                const statusColor = isOnline ? '#00ff00' : '#ff0000';
+                const statusText = isOnline ? '在线' : '掉线';
+                
+                // 获取车辆状态
+                const vehicleStatus = deviceData[device.id]?.status || 'idle';
+                let vehicleStatusText = '空闲';
+                let vehicleStatusColor = '#6b7280';
+                
+                switch(vehicleStatus) {
+                    case 'in_use':
+                        vehicleStatusText = '使用中';
+                        vehicleStatusColor = '#10b981';
+                        break;
+                    case 'abnormal':
+                        vehicleStatusText = '异常';
+                        vehicleStatusColor = '#ef4444';
+                        break;
+                    case 'idle':
+                    default:
+                        vehicleStatusText = '空闲';
+                        vehicleStatusColor = '#6b7280';
+                        break;
+                }
+                
+                const legendItem = document.createElement('div');
+                legendItem.className = 'legend-item';
+                legendItem.innerHTML = `
+                    <div class="legend-dot" style="background-color: ${statusColor}"></div>
+                    <div>${device.name} (${device.id.slice(-2)}) <span style="color:${statusColor};font-size:12px;">【${statusText}】</span> <span style="color:${vehicleStatusColor};font-size:12px;">【${vehicleStatusText}】</span></div>
+                `;
+                legendContent.appendChild(legendItem);
+            });
+            
+            legendEl.innerHTML = '<div style="font-weight: bold; margin-bottom: 5px;">设备标识</div>';
+            legendEl.appendChild(legendContent);
+        }
+
+        // 手动刷新
+        function manualRefresh() {
+            const btn = document.querySelector('.btn');
+            if (btn) {
+                btn.style.transform = 'rotate(180deg)';
+            }
+            // 重新请求所有设备数据，不刷新页面
+            initAllDevices();
+            // 恢复按钮状态
+            setTimeout(() => {
+                if (btn) {
+                    btn.style.transform = 'rotate(0deg)';
+                }
+            }, 500);
+        }
+
+        // 重置地图中心
+        function resetMapCenter() {
+            if (map) {
+                map.setZoom(15);
+                if (userPosition) {
+                    map.panTo([userPosition.lng, userPosition.lat]);
+                } else {
+                    map.panTo([116.397428, 39.90923]);
+                }
+            }
+        }
+
+        // 定位自身位置
+        function locateSelf() {
+            if (userPosition) {
+                map.panTo([userPosition.lng, userPosition.lat]);
+                map.setZoom(18);
+                
+                if (userMarker) {
+                    userMarker.setAnimation('AMAP_ANIMATION_BOUNCE');
+                    setTimeout(() => {
+                        userMarker.setAnimation(null);
+                    }, 2000);
+                }
+            } else {
+                alert('无法获取您的位置，请检查定位权限！');
+                getUserLocation();
+            }
+        }
+
+        // 定位到当前选中设备位置
+        // 校园边界坐标（根据地图上的红框确定）
+        let CAMPUS_BOUNDARY = {
+            minLat: 36.5280, // 最小纬度
+            maxLat: 36.5320, // 最大纬度
+            minLng: 103.7200, // 最小经度
+            maxLng: 103.7240  // 最大经度
+        };
+        
+        // 从本地存储中加载之前保存的边界坐标
+        function loadCampusBoundary() {
+            const savedBoundary = localStorage.getItem('campusBoundary');
+            if (savedBoundary) {
+                try {
+                    const parsed = JSON.parse(savedBoundary);
+                    CAMPUS_BOUNDARY.minLat = parsed.minLat;
+                    CAMPUS_BOUNDARY.maxLat = parsed.maxLat;
+                    CAMPUS_BOUNDARY.minLng = parsed.minLng;
+                    CAMPUS_BOUNDARY.maxLng = parsed.maxLng;
+                    if (parsed.coords) {
+                        boundaryCoords = parsed.coords;
+                    }
+                } catch (e) {
+                    console.error('加载校园边界失败:', e);
+                }
+            }
+        }
+        
+        // 初始化时加载保存的边界坐标
+        loadCampusBoundary();
+
+        // 确保位置在校园内的函数
+        function ensurePositionInCampus(lat, lng) {
+            let newLat = lat;
+            let newLng = lng;
+            
+            // 限制纬度在校园范围内
+            if (newLat < CAMPUS_BOUNDARY.minLat) newLat = CAMPUS_BOUNDARY.minLat;
+            if (newLat > CAMPUS_BOUNDARY.maxLat) newLat = CAMPUS_BOUNDARY.maxLat;
+            
+            // 限制经度在校园范围内
+            if (newLng < CAMPUS_BOUNDARY.minLng) newLng = CAMPUS_BOUNDARY.minLng;
+            if (newLng > CAMPUS_BOUNDARY.maxLng) newLng = CAMPUS_BOUNDARY.maxLng;
+            
+            return { lat: newLat, lng: newLng };
+        }
+        
+        // 检查设备是否在校园内
+        function isDeviceInCampus(lat, lng) {
+            return (lat >= CAMPUS_BOUNDARY.minLat && lat <= CAMPUS_BOUNDARY.maxLat && 
+                    lng >= CAMPUS_BOUNDARY.minLng && lng <= CAMPUS_BOUNDARY.maxLng);
+        }
+
+        // 绘制校园边界红框
+        function drawCampusBoundary() {
+            if (!map) return;
+            
+            // 清除之前的边界
+            if (boundaryPolygon) {
+                boundaryPolygon.setMap(null);
+                boundaryPolygon = null;
+            }
+            
+            let bounds;
+            // 如果有保存的边界坐标，使用保存的坐标
+            if (boundaryCoords && boundaryCoords.length === 4) {
+                bounds = boundaryCoords;
+            } else {
+                // 否则使用默认的矩形边界
+                bounds = [
+                    [CAMPUS_BOUNDARY.minLng, CAMPUS_BOUNDARY.minLat], // 左下角
+                    [CAMPUS_BOUNDARY.maxLng, CAMPUS_BOUNDARY.minLat], // 右下角
+                    [CAMPUS_BOUNDARY.maxLng, CAMPUS_BOUNDARY.maxLat], // 右上角
+                    [CAMPUS_BOUNDARY.minLng, CAMPUS_BOUNDARY.maxLat]  // 左上角
+                ];
+            }
+            
+            // 创建多边形覆盖物
+            boundaryPolygon = new AMap.Polygon({
+                path: bounds,
+                strokeColor: '#ff0000', // 红色边框
+                strokeOpacity: 1,
+                strokeWeight: 2,
+                fillColor: 'transparent', // 透明填充
+                fillOpacity: 0 // 无填充
+            });
+            
+            // 添加到地图
+            boundaryPolygon.setMap(map);
+        }
+
+        function locateDevice() {
+            if (!map) {
+                showMapInitAlert();
+                return;
+            }
+
+            if (!currentDeviceId || currentDeviceId === 'all') {
+                alert('请先在右上角选择一个具体设备，再使用“定位到设备”。');
+                return;
+            }
+
+            const data = deviceData[currentDeviceId];
+            const resolved = resolveDeviceLocation(data);
+            if (!data || data.online !== true || !isEffectiveCoord(resolved.lat, resolved.lng)) {
+                alert('该设备当前离线或暂无有效定位坐标，无法定位。');
+                return;
+            }
+
+            // 检查车辆是否在校园内
+            const lat = parseFloat(resolved.lat);
+            const lng = parseFloat(resolved.lng);
+            if (!isDeviceInCampus(lat, lng)) {
+                showStatusMessage('🚨 车辆离开校园：设备已离开兰州工业学院校园区域，请及时处理！', 'error');
+            }
+
+            const lnglat = [lng, lat];
+            map.panTo(lnglat);
+            map.setZoom(18);
+
+            const marker = deviceMarkers[currentDeviceId];
+            if (marker && typeof marker.setAnimation === 'function') {
+                marker.setAnimation('AMAP_ANIMATION_BOUNCE');
+                setTimeout(() => {
+                    marker.setAnimation(null);
+                }, 2000);
+            }
+        }
+
+        // 开始自定义校园边界
+        function startCustomBoundary() {
+            if (!map) {
+                showMapInitAlert();
+                return;
+            }
+
+            // 清除之前的边界
+            if (boundaryPolygon) {
+                boundaryPolygon.setMap(null);
+                boundaryPolygon = null;
+            }
+
+            // 重置边界坐标
+            boundaryCoords = [];
+            isDrawingBoundary = true;
+
+            // 显示提示信息
+            showStatusMessage('请在地图上点击四个点来绘制校园边界，最后点击确认完成', 'info');
+
+            // 添加地图点击事件
+            map.on('click', handleMapClickForBoundary);
+
+            // 30秒后自动取消绘制
+            setTimeout(() => {
+                if (isDrawingBoundary) {
+                    cancelCustomBoundary();
+                    showStatusMessage('自定义边界绘制已超时取消', 'warning');
+                }
+            }, 30000);
+        }
+
+        // 处理地图点击事件（用于绘制边界）
+        function handleMapClickForBoundary(e) {
+            if (!isDrawingBoundary) return;
+
+            // 获取点击位置的坐标
+            const lnglat = e.lnglat;
+            boundaryCoords.push([lnglat.getLng(), lnglat.getLat()]);
+
+            // 如果已经点击了4个点，完成绘制
+            if (boundaryCoords.length === 4) {
+                completeCustomBoundary();
+            } else {
+                // 显示当前点击的点
+                showStatusMessage(`已选择 ${boundaryCoords.length}/4 个点，继续点击绘制边界`, 'info');
+            }
+        }
+
+        // 完成自定义校园边界
+        function completeCustomBoundary() {
+            if (!map || boundaryCoords.length !== 4) return;
+
+            // 计算边界的最小和最大坐标
+            let minLat = Infinity, maxLat = -Infinity;
+            let minLng = Infinity, maxLng = -Infinity;
+
+            for (const coord of boundaryCoords) {
+                const lng = coord[0];
+                const lat = coord[1];
+                minLng = Math.min(minLng, lng);
+                maxLng = Math.max(maxLng, lng);
+                minLat = Math.min(minLat, lat);
+                maxLat = Math.max(maxLat, lat);
+            }
+
+            // 保存旧的边界坐标，用于后续检查
+            const oldBoundary = JSON.parse(JSON.stringify(CAMPUS_BOUNDARY));
+            
+            // 更新校园边界坐标
+            CAMPUS_BOUNDARY.minLat = minLat;
+            CAMPUS_BOUNDARY.maxLat = maxLat;
+            CAMPUS_BOUNDARY.minLng = minLng;
+            CAMPUS_BOUNDARY.maxLng = maxLng;
+
+            // 绘制边界多边形
+            if (boundaryPolygon) {
+                boundaryPolygon.setMap(null);
+            }
+
+            boundaryPolygon = new AMap.Polygon({
+                path: boundaryCoords,
+                strokeColor: '#ff0000', // 红色边框
+                strokeOpacity: 1,
+                strokeWeight: 2,
+                fillColor: 'transparent', // 透明填充
+                fillOpacity: 0 // 无填充
+            });
+
+            boundaryPolygon.setMap(map);
+
+            // 移除地图点击事件
+            map.off('click', handleMapClickForBoundary);
+            isDrawingBoundary = false;
+
+            // 保存边界坐标到本地存储
+            localStorage.setItem('campusBoundary', JSON.stringify({
+                minLat: CAMPUS_BOUNDARY.minLat,
+                maxLat: CAMPUS_BOUNDARY.maxLat,
+                minLng: CAMPUS_BOUNDARY.minLng,
+                maxLng: CAMPUS_BOUNDARY.maxLng,
+                coords: boundaryCoords
+            }));
+            
+            // 不重新获取设备数据，确保设备图标保持在原来的位置
+            // 只确保设备图标在新的边界范围内
+            if (currentDeviceId !== 'all' && deviceMarkers[currentDeviceId]) {
+                const currentPosition = deviceMarkers[currentDeviceId].getPosition();
+                if (currentPosition) {
+                    const campusPos = ensurePositionInCampus(currentPosition.lat, currentPosition.lng);
+                    if (campusPos.lat !== currentPosition.lat || campusPos.lng !== currentPosition.lng) {
+                        deviceMarkers[currentDeviceId].setPosition([campusPos.lng, campusPos.lat]);
+                    }
+                }
+            }
+            
+            // 显示成功信息
+            showStatusMessage('校园边界自定义成功！', 'success');
+        }
+
+        // 取消自定义校园边界
+        function cancelCustomBoundary() {
+            if (!map) return;
+
+            // 移除地图点击事件
+            map.off('click', handleMapClickForBoundary);
+            isDrawingBoundary = false;
+
+            // 清除边界坐标
+            boundaryCoords = [];
+
+            // 显示取消信息
+            showStatusMessage('自定义边界绘制已取消', 'info');
+        }
+
+        // 初始化告警音频
+        function initAlertAudio() {
+            alertAudio = new Audio('https://freesound.org/data/previews/508/508120_10226512-lq.mp3');
+            alertAudio.loop = false;
+            alertAudio.volume = 0.7;
+            
+            alertAudio.onerror = function() {
+                console.error('告警音频加载失败');
+                alertAudio = null;
+            };
+        }
+
+        // 播放告警声音
+        function playAlertSound() {
+            if (!alertAudio) return;
+            
+            try {
+                alertAudio.currentTime = 0;
+                const playPromise = alertAudio.play();
+                
+                playPromise?.catch(err => {
+                    console.error('播放告警声音失败（浏览器策略限制）：', err);
+                    showStatusMessage('检测到车辆震动，但无法播放告警声音（需用户交互后才能播放）', 'error');
+                });
+            } catch (e) {
+                console.error('播放告警声音失败：', e);
+            }
+        }
+
+        // 检查HTTPS协议
+        function checkHttpsProtocol() {
+            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                console.warn('建议使用HTTPS协议以获得更好的定位体验');
+            }
+        }
+
+        // ========== 轨迹显示/消除功能 ==========
+        function getTargetDeviceIdsForTrack() {
+            if (currentDeviceId === 'all') {
+                return DEVICES_CONFIG.map(d => d.id);
+            }
+            return currentDeviceId ? [currentDeviceId] : [];
+        }
+
+        function getDeviceColor(deviceId) {
+            const device = DEVICES_CONFIG.find(d => d.id === deviceId);
+            return device?.color || '#2563eb';
+        }
+
+        function updateTrackButtonsUI() {
+            const toggleBtn = document.getElementById('btnToggleTrack');
+            if (!toggleBtn) return;
+
+            const icon = trackVisible ? 'fa-eye-slash' : 'fa-route';
+            const text = trackVisible ? '隐藏轨迹' : '显示轨迹';
+            toggleBtn.innerHTML = `<i class="fas ${icon}"></i> ${text}`;
+        }
+
+        function removeAllTrackPolylines() {
+            Object.keys(trackPolylines).forEach(deviceId => {
+                const item = trackPolylines[deviceId];
+                if (!item) return;
+                try {
+                    if (Array.isArray(item)) {
+                        item.forEach(pl => { try { pl.setMap(null); } catch(e){} });
+                    } else {
+                        item.setMap(null);
+                    }
+                } catch (e) {}
+            });
+            trackPolylines = {};
+        }
+
+        async function fetchDeviceTrack(deviceId) {
+            const response = await fetchWithTimeout(`${API_BASE_URL}/api/device/${encodeURIComponent(deviceId)}/track`, {
+                method: 'GET',
+                cache: 'no-cache',
+                headers: { 'Content-Type': 'application/json' }
+            }, 6000);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const result = await response.json();
+            if (result.code !== 0) throw new Error(result.msg || '获取轨迹失败');
+            // 兼容后端返回的新结构（包含segments），这里仍返回合并后的path用于原有显示
+            const path = Array.isArray(result.data?.path) ? result.data.path : [];
+            return path;
+        }
+
+        async function fetchDeviceTrackSegments(deviceId) {
+            const response = await fetchWithTimeout(`${API_BASE_URL}/api/device/${encodeURIComponent(deviceId)}/track`, {
+                method: 'GET',
+                cache: 'no-cache',
+                headers: { 'Content-Type': 'application/json' }
+            }, 6000);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const result = await response.json();
+            if (result.code !== 0) throw new Error(result.msg || '获取轨迹失败');
+            return Array.isArray(result.data?.segments) ? result.data.segments : [];
+        }
+
+        // 基于分段渲染：每段单独一条折线，避免跨段直线
+        function renderTrackPolylinesFromSegments(deviceId, segments) {
+            if (!map) return;
+            // 清理旧的本设备轨迹线
+            const existing = trackPolylines[deviceId];
+            if (existing) {
+                try {
+                    if (Array.isArray(existing)) {
+                        existing.forEach(pl => { try { pl.setMap(null); } catch(e){} });
+                    } else {
+                        existing.setMap(null);
+                    }
+                } catch (e) {}
+                delete trackPolylines[deviceId];
+            }
+
+            const polylines = [];
+            const color = getDeviceColor(deviceId);
+            const MAX_JUMP = 5000; // 与后端一致，过滤>5km跳点
+
+            // 只显示最近的轨迹段（最新的一段）
+            const recentSegments = segments && segments.length > 0 ? [segments[segments.length - 1]] : [];
+
+            recentSegments.forEach(seg => {
+                let pts = (seg.path || [])
+                    .filter(p => Array.isArray(p) && p.length >= 2)
+                    .map(p => {
+                        // 轨迹数据是WGS84坐标，需要转换为GCJ02坐标
+                        const wgsLng = parseFloat(p[0]);
+                        const wgsLat = parseFloat(p[1]);
+                        const [gcjLng, gcjLat] = CoordTransform.wgs84togcj02(wgsLng, wgsLat);
+                        return [gcjLng, gcjLat];
+                    })
+                    .filter(p => !isNaN(p[0]) && !isNaN(p[1]) && p[0] !== 0 && p[1] !== 0);
+                if (pts.length < 2) return;
+                // 进一步过滤不合理跳点
+                const cleaned = [pts[0]];
+                for (let i = 1; i < pts.length; i++) {
+                    const prev = cleaned[cleaned.length - 1];
+                    const cur = pts[i];
+                    const dist = calculateDistance(prev[1], prev[0], cur[1], cur[0]); // lat,lon
+                    if (dist <= MAX_JUMP) cleaned.push(cur);
+                }
+                if (cleaned.length < 2) return;
+                
+                // 确保轨迹的最后一个点与设备标记的位置一致
+                // 获取设备的当前位置
+                const deviceStatus = deviceData[deviceId];
+                if (deviceStatus && isEffectiveCoord(deviceStatus.lat, deviceStatus.lng)) {
+                    // 转换设备坐标到GCJ02
+                    const [deviceLng, deviceLat] = CoordTransform.wgs84togcj02(deviceStatus.lng, deviceStatus.lat);
+                    // 将轨迹的最后一个点设置为设备的当前位置
+                    cleaned[cleaned.length - 1] = [deviceLng, deviceLat];
+                }
+                
+                const polyline = new AMap.Polyline({
+                    path: cleaned,
+                    strokeColor: color,
+                    strokeWeight: 6,
+                    strokeOpacity: 0.85,
+                    strokeStyle: 'solid',
+                    zIndex: 40
+                });
+                polyline.setMap(map);
+                polylines.push(polyline);
+            });
+
+            if (polylines.length > 0) {
+                trackPolylines[deviceId] = polylines;
+            }
+        }
+
+        // 轨迹数据缓存，用于检测变化
+        const trackDataCache = {};
+
+        // 原始的refreshTrackDisplay函数
+        async function _refreshTrackDisplay(options = {}) {
+            const { fitView = false, notifyOnEmpty = false } = options;
+            if (!map) {
+                showMapInitAlert();
+                return;
+            }
+
+            const targetIds = getTargetDeviceIdsForTrack();
+            // 切换显示范围时，先移除不需要的线
+            const targetSet = new Set(targetIds);
+            Object.keys(trackPolylines).forEach(existingId => {
+                if (!targetSet.has(existingId)) {
+                    trackPolylines[existingId].setMap(null);
+                    delete trackPolylines[existingId];
+                    delete trackDataCache[existingId]; // 清理缓存
+                }
+            });
+
+            if (targetIds.length === 0) return;
+
+            let anyShown = false;
+            const allPathsForFitView = [];
+
+            await Promise.all(targetIds.map(async (deviceId) => {
+                try {
+                    // 获取轨迹数据
+                    const segments = await fetchDeviceTrackSegments(deviceId);
+                    
+                    // 检测轨迹数据是否有变化
+                    const currentTrackKey = JSON.stringify(segments && segments.length > 0 ? segments[segments.length - 1] : null);
+                    const cachedTrackKey = trackDataCache[deviceId];
+                    
+                    if (currentTrackKey === cachedTrackKey) {
+                        // 轨迹数据没有变化，跳过渲染
+                        if (trackPolylines[deviceId]) {
+                            anyShown = true;
+                            if (fitView) {
+                                trackPolylines[deviceId].forEach(pl => {
+                                    const path = pl.getPath ? pl.getPath() : [];
+                                    path.forEach(p => { if (p && typeof p.lng === 'number' && typeof p.lat === 'number') allPathsForFitView.push([p.lng, p.lat]); });
+                                });
+                            }
+                        }
+                        return;
+                    }
+                    
+                    // 轨迹数据有变化，更新缓存
+                    trackDataCache[deviceId] = currentTrackKey;
+                    
+                    // 清理旧的本设备轨迹线
+                    const existing = trackPolylines[deviceId];
+                    if (existing) {
+                        try {
+                            if (Array.isArray(existing)) {
+                                existing.forEach(pl => { try { pl.setMap(null); } catch(e){} });
+                            } else {
+                                existing.setMap(null);
+                            }
+                        } catch (e) {}
+                        delete trackPolylines[deviceId];
+                    }
+
+                    const polylines = [];
+                    const color = getDeviceColor(deviceId);
+                    const MAX_JUMP = 5000;
+                    const TIME_GAP_THRESHOLD = 30000; // 时间间隔阈值（30秒）
+
+                    // 只显示最近的轨迹段（最新的一段）
+                    const recentSegments = segments && segments.length > 0 ? [segments[segments.length - 1]] : [];
+                    
+                    recentSegments.forEach(seg => {
+                        // 保留时间戳信息，不只是经度和纬度
+                        let pts = (seg.path || [])
+                            .filter(p => Array.isArray(p) && p.length >= 2)
+                            .map(p => {
+                                // 轨迹数据是WGS84坐标，需要转换为GCJ02坐标
+                                const wgsLng = parseFloat(p[0]);
+                                const wgsLat = parseFloat(p[1]);
+                                const [gcjLng, gcjLat] = CoordTransform.wgs84togcj02(wgsLng, wgsLat);
+                                const time = p.length >= 3 ? parseInt(p[2], 10) : 0;
+                                return [gcjLng, gcjLat, time];
+                            })
+                            .filter(p => !isNaN(p[0]) && !isNaN(p[1]) && p[0] !== 0 && p[1] !== 0);
+                        
+                        if (pts.length < 2) return;
+
+                        // 不限制点数量，显示所有点
+                        const allPts = pts;
+                        
+                        if (allPts.length < 2) return;
+
+                        // 过滤不合理跳点和时间间隔过大的点
+                        const cleaned = [];
+                        
+                        for (let i = 0; i < allPts.length; i++) {
+                            const cur = allPts[i];
+                            const curTime = cur[2] || 0;
+                            
+                            if (i === 0) {
+                                cleaned.push(cur);
+                            } else {
+                                const prev = allPts[i-1];
+                                const prevTime = prev[2] || 0;
+                                const timeGap = curTime - prevTime;
+                                const dist = calculateDistance(prev[1], prev[0], cur[1], cur[0]);
+                                
+                                if (dist <= MAX_JUMP && timeGap <= TIME_GAP_THRESHOLD) {
+                                    cleaned.push(cur);
+                                } else {
+                                    console.log(`[分段轨迹] 设备${deviceId} 时间间隔过大(${timeGap}ms)，已分段`);
+                                    if (cleaned.length > 0) {
+                                        if (cleaned.length >= 2) {
+                                            renderGradientPolyline(cleaned, color, polylines, map);
+                                        }
+                                        cleaned.length = 0;
+                                    }
+                                    cleaned.push(cur);
+                                }
+                            }
+                        }
+
+                        if (cleaned.length >= 2) {
+                            renderGradientPolyline(cleaned, color, polylines, map);
+                        }
+                    });
+
+                    if (polylines.length > 0) {
+                        trackPolylines[deviceId] = polylines;
+                        anyShown = true;
+                        if (fitView) {
+                            polylines.forEach(pl => {
+                                const path = pl.getPath ? pl.getPath() : [];
+                                path.forEach(p => { if (p && typeof p.lng === 'number' && typeof p.lat === 'number') allPathsForFitView.push([p.lng, p.lat]); });
+                            });
+                        }
+                    }
+                } catch (e) {
+                    // 单个设备失败不影响其它设备
+                    console.warn(`获取设备${deviceId}轨迹失败：`, e);
+                }
+            }));
+
+            if (!anyShown) {
+                if (notifyOnEmpty && !hasNotifiedNoTrack) {
+                    hasNotifiedNoTrack = true;
+                    alert('暂无可显示的轨迹（可能是设备尚未产生有效GPS点）。');
+                }
+            } else if (fitView && allPathsForFitView.length > 0) {
+                try {
+                    map.setFitView(allPathsForFitView, false, [60, 60, 60, 60]);
+                } catch (e) {}
+            }
+        }
+
+        // 防抖版本的refreshTrackDisplay函数
+        const refreshTrackDisplay = debounce(_refreshTrackDisplay, 300);
+
+        function startTrackAutoRefresh() {
+            stopTrackAutoRefresh();
+            trackRefreshTimer = setInterval(() => {
+                if (!trackVisible) return;
+                refreshTrackDisplay({ fitView: false, notifyOnEmpty: false });
+            }, TRACK_REFRESH_INTERVAL);
+        }
+
+        function stopTrackAutoRefresh() {
+            if (trackRefreshTimer) {
+                clearInterval(trackRefreshTimer);
+                trackRefreshTimer = null;
+            }
+        }
+
+        async function toggleTrackDisplay() {
+            trackVisible = !trackVisible;
+            updateTrackButtonsUI();
+
+            if (trackVisible) {
+                hasNotifiedNoTrack = false;
+                await refreshTrackDisplay({ fitView: true, notifyOnEmpty: true });
+                startTrackAutoRefresh();
+            } else {
+                stopTrackAutoRefresh();
+                removeAllTrackPolylines();
+                // 关闭时顺便移除历史覆盖线
+                historyPolylines.forEach(pl => { try { pl.setMap(null); } catch(e){} });
+                historyPolylines = [];
+            }
+        }
+
+        async function clearTrack() {
+            const targetIds = getTargetDeviceIdsForTrack();
+            if (targetIds.length === 0) {
+                trackVisible = false;
+                updateTrackButtonsUI();
+                alert('当前无可清除的轨迹。');
+                return;
+            }
+
+            const isAll = currentDeviceId === 'all';
+            const ok = confirm(isAll ? '确定要清空“所有设备”的历史轨迹吗？此操作将永久删除轨迹数据！' : `确定要清空设备 ${currentDeviceId} 的历史轨迹吗？此操作将永久删除轨迹数据！`);
+            if (!ok) return;
+            const ok2 = confirm('再次确认：该操作将删除历史轨迹数据，无法恢复！');
+            if (!ok2) return;
+
+            try {
+                // 先停止自动刷新，防止清除后又重新显示
+                stopTrackAutoRefresh();
+
+                // 调用后端API删除历史轨迹数据
+                for (const deviceId of targetIds) {
+                    const response = await fetchWithTimeout(`${API_BASE_URL}/api/device/${encodeURIComponent(deviceId)}/track`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }, 5000);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status} ${response.statusText}`);
+                    }
+                }
+
+                const clearPlan = TrackUtils.buildClearPlan(targetIds, trackPolylines);
+                clearPlan.polylines.forEach(item => {
+                    try {
+                        if (Array.isArray(item.polyline)) {
+                            item.polyline.forEach(pl => { try { pl.setMap(null); } catch(e){} });
+                        } else if (item.polyline && typeof item.polyline.setMap === 'function') {
+                            item.polyline.setMap(null);
+                        }
+                    } catch (e) {
+                        console.warn(`清除设备 ${item.id} 轨迹显示失败:`, e);
+                    }
+                });
+
+                clearPlan.ids.forEach(id => {
+                    delete trackPolylines[id];
+                });
+
+                // 同时清除轨迹数据缓存
+                Object.keys(trackDataCache).forEach(key => {
+                    delete trackDataCache[key];
+                });
+
+                trackVisible = false;
+                updateTrackButtonsUI();
+
+                appendTrackClearLog({
+                    time: new Date().toISOString(),
+                    user: getAuditUser(),
+                    trackIds: targetIds,
+                    count: clearPlan.ids.length
+                });
+
+                alert('已成功清除历史轨迹数据！');
+            } catch (error) {
+                console.error('清除轨迹失败：', error);
+                alert(`清除轨迹失败：${error.message}`);
+            }
+        }
+
+        // 初始化按钮文案
+        updateTrackButtonsUI();
+
+        // 主题相关
+        function initTheme() {
+            const saved = localStorage.getItem('theme');
+            if (saved === 'dark' || saved === 'light') {
+                currentTheme = saved;
+            } else {
+                const preferDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                currentTheme = preferDark ? 'dark' : 'light';
+            }
+            applyThemeToDom();
+        }
+
+        function toggleTheme() {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('theme', currentTheme);
+            applyThemeToDom();
+            try {
+                if (map && typeof map.setMapStyle === 'function') {
+                    // 夜间切换不影响地图样式，始终保持日间样式
+                    map.setMapStyle('amap://styles/normal');
+                }
+            } catch (e) {}
+        }
+
+        function applyThemeToDom() {
+            document.body.classList.toggle('theme-dark', currentTheme === 'dark');
+            document.body.classList.toggle('theme-light', currentTheme === 'light');
+            const btn = document.getElementById('btnThemeToggle');
+            if (btn) {
+                if (currentTheme === 'dark') {
+                    btn.innerHTML = '<i class="fas fa-moon"></i>';
+                } else {
+                    btn.innerHTML = '<i class="fas fa-sun"></i>';
+                }
+            }
+        }
+
+        // 历史行程相关
+        function openHistoryModal() {
+            if (!map) { showMapInitAlert(); return; }
+            if (!currentDeviceId || currentDeviceId === 'all') {
+                alert('请先在右上角选择一个具体设备，再查看历史行程。');
+                return;
+            }
+            const modal = document.getElementById('historyModal');
+            const content = document.getElementById('historyContent');
+            content.innerHTML = '加载中...';
+            modal.classList.add('show');
+            initHistoryMap();
+            fetchDeviceTrackSegments(currentDeviceId).then(segments => {
+                _historySegments = segments;
+                if (segments.length === 0) {
+                    content.innerHTML = '<div style="padding:12px;color:#6b7280;">暂无历史行程（最多保留最近3小时分段）。</div>';
+                    return;
+                }
+                const html = segments.map((seg, idx) => {
+                    const start = seg.startTime ? new Date(seg.startTime).toLocaleString() : seg.hourKey;
+                    const end = seg.endTime ? new Date(seg.endTime).toLocaleString() : '';
+                    const count = Array.isArray(seg.path) ? seg.path.length : 0;
+                    return `
+                        <div class="device-item">
+                            <div class="device-info-left">
+                                <div class="device-name">第${idx+1}段（${seg.hourKey}）</div>
+                                <div class="device-id">${start} ~ ${end} | 点数：${count}</div>
+                            </div>
+                            <div class="device-info-right">
+                                <button class="btn btn-device-locate" data-idx="${idx}" onclick="viewHistorySegment(${idx})"><i class="fas fa-eye"></i> 查看</button>
+                                <button class="btn btn-delete" data-idx="${idx}" onclick="deleteHistorySegment(${idx})"><i class="fas fa-trash"></i> 删除</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                content.innerHTML = html + `<div style="padding:8px;display:flex;gap:8px;justify-content:flex-end">
+                    <button class="btn btn-secondary" onclick="clearHistoryOverlays()">清除覆盖</button>
+                    <button class="btn" onclick="closeHistoryModal()">关闭</button>
+                </div>`;
+            }).catch(err => {
+                content.innerHTML = `<div style="padding:12px;color:#991b1b;">加载失败：${err.message}</div>`;
+            });
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('historyModal').classList.remove('show');
+        }
+
+        function clearHistoryOverlays() {
+            historyPolylines.forEach(pl => { try { pl.setMap(null); } catch(e){} });
+            historyPolylines = [];
+        }
+
+        function viewHistorySegment(idx) {
+            if (!historyMap) return;
+            const seg = _historySegments[idx];
+            if (!seg || !Array.isArray(seg.path) || seg.path.length < 2) {
+                alert('该分段轨迹点不足，无法显示。');
+                return;
+            }
+            const MAX_JUMP = 5000;
+            let pts = (seg.path || [])
+                .filter(p => Array.isArray(p) && p.length >= 2)
+                .map(p => {
+                    // 轨迹数据是WGS84坐标，需要转换为GCJ02坐标
+                    const wgsLng = parseFloat(p[0]);
+                    const wgsLat = parseFloat(p[1]);
+                    const [gcjLng, gcjLat] = CoordTransform.wgs84togcj02(wgsLng, wgsLat);
+                    return [gcjLng, gcjLat];
+                })
+                .filter(p => !isNaN(p[0]) && !isNaN(p[1]) && p[0] !== 0 && p[1] !== 0);
+            const validPath = [];
+            if (pts.length >= 2) {
+                validPath.push(pts[0]);
+                for (let i = 1; i < pts.length; i++) {
+                    const prev = validPath[validPath.length - 1];
+                    const cur = pts[i];
+                    const dist = calculateDistance(prev[1], prev[0], cur[1], cur[0]);
+                    if (dist <= MAX_JUMP) validPath.push(cur);
+                }
+            }
+            if (validPath.length < 2) {
+                alert('该分段轨迹点无效，无法显示。');
+                return;
+            }
+            const polyline = new AMap.Polyline({
+                path: validPath,
+                strokeColor: getDeviceColor(currentDeviceId),
+                strokeWeight: 5,
+                strokeOpacity: 0.9,
+                strokeStyle: 'dashed',
+                zIndex: 45
+            });
+            polyline.setMap(historyMap);
+            historyPolylines.push(polyline);
+            try { historyMap.setFitView([polyline]); } catch(e){}
+        }
+
+        // 历史行程：删除单段
+        async function deleteHistorySegment(idx) {
+            const seg = _historySegments[idx];
+            if (!seg) return;
+            const ok = confirm('确定删除该行程分段吗？此操作不可恢复。');
+            if (!ok) return;
+            const deviceId = currentDeviceId;
+            const qs = seg.hourKey ? `?hourKey=${encodeURIComponent(seg.hourKey)}` : `?index=${idx}`;
+            const url = `${API_BASE_URL}/api/device/${encodeURIComponent(deviceId)}/track/segment${qs}`;
+            try {
+                const resp = await fetch(url, { method: 'DELETE' });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                // 从本地列表移除并刷新界面
+                _historySegments.splice(idx, 1);
+                openHistoryModal();
+                
+                // 重新获取主页轨迹数据，确保主页轨迹与历史记录同步
+                if (trackVisible) {
+                    await refreshTrackDisplay({ fitView: false, notifyOnEmpty: false });
+                }
+            } catch (e) {
+                alert('删除失败：' + e.message);
+            }
+        }
+
+        // 历史行程独立地图
+        let historyMap = null;
+        function initHistoryMap() {
+            const container = document.getElementById('historyMap');
+            if (!container) return;
+            if (historyMap) {
+                try { historyMap.destroy(); } catch (e) {}
+                historyMap = null;
+            }
+            try {
+                historyMap = new AMap.Map('historyMap', {
+                    zoom: 12,
+                    center: [116.397428, 39.90923],
+                    resizeEnable: true,
+                    mapStyle: 'amap://styles/normal'
+                });
+                setTimeout(() => { try { historyMap.resize(); } catch(e){} }, 100);
+            } catch (e) {
+                console.warn('历史地图初始化失败：', e);
+            }
+        }
+    </script>
+</body>
+</html>
